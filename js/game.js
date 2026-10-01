@@ -27,6 +27,23 @@ function seeded(str){let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h
   return function(){h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return((h^(h>>>14))>>>0)/4294967296}}
 function dailyWind(num){const r=seeded('bb-wind/'+dayKey()+'/'+num),ex=window.BB_DATA.exposure[num]||0;
   const wa=r()*Math.PI*2,kmh=Math.round(10+r()*10+ex*(8+r()*10)),a=kmh*3.6*WIND_FX;return{ax:Math.cos(wa)*a,ay:Math.sin(wa)*a,kmh:kmh,wa:wa}}
+// How today's wind plays on a hole, seen from the tee looking at the pin. Used by Steffen's tips and the start toast.
+function windRead(num){const h=HOLES.find(x=>x.num===num),w=dailyWind(num);if(!h)return null;
+  const dx=h.pin.x-h.tee.x,dy=h.pin.y-h.tee.y,l=Math.hypot(dx,dy),cw=Math.cos(w.wa),sw=Math.sin(w.wa);
+  const along=(cw*dx+sw*dy)/l,side=(cw*-dy+sw*dx)/l;
+  const push=Math.abs(side)>0.4?(side>0?'right':'left'):null,head=along<-0.4,tail=along>0.4;
+  return{kmh:w.kmh,push:push,head:head,tail:tail,coast:(window.BB_DATA.exposure[num]||0)>=0.7}}
+function windShort(r){const parts=[];if(r.head)parts.push('into your face');if(r.tail)parts.push('behind you');if(r.push)parts.push('pushing the ball '+r.push);
+  return 'Wind '+r.kmh+' km/h, '+(parts.join(' and ')||'swirling')+'.'}
+function windTip(num){const r=windRead(num);if(!r)return null;
+  const feel=r.kmh<15?'Just a light breeze today':r.kmh<25?'A steady breeze today':'The wind is really blowing today';
+  const where=r.coast?" We're right on the sea here, so it blows harder than inland.":'';
+  const tips=[];if(r.push)tips.push('aim a little '+(r.push==='right'?'left':'right')+' of your target');
+  if(r.head)tips.push('hit it harder, or keep it low under the wind');if(r.tail)tips.push('ease off, because the ball will fly further');
+  if(!tips.length)tips.push('it will move your ball less than you think, so trust your line');
+  if(r.kmh>=25&&r.push&&!r.head)tips.push('a low shot keeps it out of the worst of it');
+  const t=tips.join(', and ');
+  return feel+', '+r.kmh+' km/h, '+(windShort(r).replace(/^Wind \d+ km\/h, /,'').replace(/\.$/,''))+'.'+where+' The dotted arc ignores the wind, so '+t+'.'}
 function startHole(i){
   hole=HOLES[i];document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
@@ -34,6 +51,7 @@ function startHole(i){
   wind=dailyWind(hole.num);trail=[];aimMark=null;
   $('windSpeed').textContent=wind.kmh;$('windArrow').style.transform='rotate('+(wind.wa*180/Math.PI+90)+'deg)';
   scale=0;resize();cam.x=ball.x;cam.y=ball.y;updateHud();$('hint').style.opacity=1;
+  const num=hole.num;setTimeout(()=>{if(hole.num===num&&!document.body.classList.contains('tutorial-on'))toast(windShort(windRead(num)),4500)},700);
 }
 function updateHud(){
   const lf=document.querySelector('.loft');if(lf)lf.style.visibility=isPutt()?'hidden':'';
@@ -41,7 +59,7 @@ function updateHud(){
   const d=Math.round(Math.hypot(hole.pin.x-ball.x,hole.pin.y-ball.y)*hole.m);
   $('info').textContent='Par '+hole.par+'. '+LIE_NAME[lieAt(ball.x,ball.y)]+', '+d+' m to the pin';
 }
-function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200)}
+function toast(msg,ms){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),ms||2200)}
 
 function resize(){
   dpr=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;
@@ -207,7 +225,7 @@ mapEl.addEventListener('wheel',e=>{e.preventDefault();const r=mapEl.getBoundingC
 function selectHole(n){selNum=n;for(const k in markBtns)markBtns[k].classList.toggle('sel',+k===n);const live=HOLES.some(h=>h.num===n);
   $('sheetTitle').textContent='Hole '+n;$('statPar').textContent=CARD[n][0];$('statHcp').textContent=HCP[n];
   const pi=$('proImg');pi.style.animation='none';void pi.offsetWidth;pi.style.animation='';
-  dlg.lines=TIPS[n]||genericTips(n);dlg.i=0;
+  dlg.lines=(TIPS[n]||genericTips(n)).slice();if(live)dlg.lines.splice(1,0,windTip(n));dlg.i=0;
   $('sheetPlay').disabled=!live;$('sheetPlay').textContent=live?'Play':'Soon';$('sheet').hidden=false;typeLine()}
 function openMap(){state='intro';$('introOverlay').hidden=true;$('endOverlay').hidden=true;$('sheet').hidden=true;mapEl.classList.add('open');mapFit();
   for(const k in markBtns)markBtns[k].classList.remove('sel')}
