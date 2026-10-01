@@ -12,6 +12,7 @@ HOLES.forEach(h=>{h.img=new Image();h.img.src=h.src});
 let hole=HOLES[0];
 function lieAt(x,y){const mx=Math.floor(x/4),my=Math.floor(y/4);if(mx<0||my<0||mx>=hole.mw||my>=hole.mh)return S.WATER;return hole.mask[my*hole.mw+mx]}
 function emit(name,detail){window.dispatchEvent(new CustomEvent('bb:'+name,{detail:detail}))}
+const SNOW=false; // falling snow, switched off for now
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
@@ -37,7 +38,7 @@ function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show')
 function resize(){
   dpr=Math.min(window.devicePixelRatio||1,2);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;
   baseScale=Math.max(Math.min(W/hole.w,H/hole.h),H/hole.h*0.85);fitScale=Math.min(W/hole.w,(H-150)/hole.h)*0.97;if(!scale)scale=baseScale;
-  flakes=[];const n=reduceMotion?0:Math.round(W*H/9000);
+  flakes=[];const n=(reduceMotion||!SNOW)?0:Math.round(W*H/9000);
   for(let i=0;i<n;i++)flakes.push({x:Math.random()*W,y:Math.random()*H,r:0.8+Math.random()*1.8,s:12+Math.random()*28,d:Math.random()*6});
 }
 addEventListener('resize',resize);
