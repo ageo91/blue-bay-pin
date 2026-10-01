@@ -46,10 +46,10 @@ function place(){
   spotEl.hidden=false;
 }
 function type(full){
-  clearInterval(typing);typing=null;more.hidden=true;
+  clearInterval(typing);typing=null;more.hidden=true;if(window.Steffen)Steffen.say(full);
   if(reduceMotion){text.textContent=full;done();return}
   let c=0;text.textContent='';
-  typing=setInterval(()=>{c+=2;text.textContent=full.slice(0,c);if(c>=full.length){clearInterval(typing);typing=null;done()}},26);
+  typing=setInterval(()=>{c+=2;text.textContent=full.slice(0,c);if(window.Steffen)Steffen.speak(full.slice(0,c));if(c>=full.length){clearInterval(typing);typing=null;done()}},26);
 }
 function textOf(s){return s.penaltyText&&lastPenalty?s.penaltyText:s.text}
 function done(){text.textContent=textOf(STEPS[i]);more.hidden=STEPS[i].mode!=='talk'}

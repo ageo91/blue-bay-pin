@@ -29,7 +29,7 @@
     <div id="marks"></div>
     <div class="maphead"><div class="brand"><img class="maplogo" alt="Blue Bay Curaçao Golf &amp; Beach Resort" src="assets/blue-bay-logo.png"><div class="pill maptip">Tap a blue hole to play</div></div><button id="mapMenuBtn">Menu</button></div>
     <div class="sheet" id="sheet" hidden>
-      <img class="proimg" id="proImg" alt="Steffen Kefer, Blue Bay golf pro" src="assets/steffen.png">
+      <canvas class="proimg" id="proImg" data-steffen role="img" aria-label="Steffen Kefer, Blue Bay golf pro"></canvas>
       <div class="dlg" id="dlg" role="button" tabindex="0" aria-label="Next tip">
         <span class="tag">Steffen Kefer</span>
         <p id="dlgText" aria-live="polite"></p>
@@ -82,7 +82,7 @@
     <div id="tutSpot" hidden></div>
     <div id="tutFinger" hidden></div>
     <div class="tut-panel">
-      <img class="tut-pro" src="assets/steffen.png" alt="">
+      <canvas class="tut-pro" data-steffen aria-hidden="true"></canvas>
       <div class="dlg tut-dlg" id="tutDlg" role="button" tabindex="0" aria-label="Continue">
         <span class="tag">Steffen Kefer</span>
         <p id="tutText" aria-live="polite"></p>
@@ -101,6 +101,7 @@
 <script src="assets/masks/hole-6.js"></script>
 <script src="assets/masks/hole-7.js"></script>
 <script src="js/data.js"></script>
+<script src="js/steffen.js"></script>
 <script src="js/game.js"></script>
 <script src="js/tutorial.js"></script>
 </body>

@@ -194,9 +194,9 @@ const MARKS=window.BB_DATA.marks,CARD=window.BB_DATA.card,HCP=window.BB_DATA.hcp
 function genericTips(n){const h=HCP[n],lvl=h<=6?'one of the toughest holes out here':h<=12?'a fair test, right in the middle of the pack':'one of the more forgiving holes on the course';
  return["Hole "+n+", par "+CARD[n][0]+". Handicap "+h+" makes it "+lvl+".","I'm still walking this one with the greenkeepers. It'll be playable soon. For now, try holes 1 to 4, 6 or 7."]}
 let dlg={lines:[],i:0,c:0,timer:null};
-function typeLine(){clearInterval(dlg.timer);const full=dlg.lines[dlg.i];dlg.c=0;$('dlgMore').hidden=true;
+function typeLine(){clearInterval(dlg.timer);const full=dlg.lines[dlg.i];dlg.c=0;$('dlgMore').hidden=true;if(window.Steffen)Steffen.say(full);
  if(reduceMotion){$('dlgText').textContent=full;lineDone();return}
- $('dlgText').textContent='';dlg.timer=setInterval(()=>{dlg.c+=2;$('dlgText').textContent=full.slice(0,dlg.c);if(dlg.c>=full.length){clearInterval(dlg.timer);dlg.timer=null;lineDone()}},28)}
+ $('dlgText').textContent='';dlg.timer=setInterval(()=>{dlg.c+=2;$('dlgText').textContent=full.slice(0,dlg.c);if(window.Steffen)Steffen.speak(full.slice(0,dlg.c));if(dlg.c>=full.length){clearInterval(dlg.timer);dlg.timer=null;lineDone()}},28)}
 function lineDone(){$('dlgText').textContent=dlg.lines[dlg.i];$('dlgMore').hidden=dlg.i>=dlg.lines.length-1;$('dlg').setAttribute('aria-label',dlg.i>=dlg.lines.length-1?'Start over':'Next tip')}
 function advance(){if(dlg.timer){clearInterval(dlg.timer);dlg.timer=null;lineDone();return}dlg.i=(dlg.i+1)%dlg.lines.length;typeLine()}
 $('dlg').addEventListener('click',advance);$('dlg').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();advance()}});
