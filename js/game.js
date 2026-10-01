@@ -180,7 +180,7 @@ function showEnd(){emit('holed',{strokes:strokes});
   const other=(HOLES.indexOf(hole)+1)%HOLES.length;$('nextBtn').textContent='Play hole '+HOLES[other].num;$('nextBtn').dataset.hole=other;
   $('shareBtn').textContent='Share my score';$('endOverlay').hidden=false;$('nextBtn').focus();
 }
-document.querySelectorAll('.holepick').forEach(b=>b.onclick=()=>{$('introOverlay').hidden=true;startHole(+b.dataset.hole)});
+document.querySelectorAll('.holepick').forEach(b=>b.onclick=()=>{$('introOverlay').hidden=true;closeMap();startHole(+b.dataset.hole)});
 $('nextBtn').onclick=()=>{$('endOverlay').hidden=true;startHole(+$('nextBtn').dataset.hole)};
 $('againBtn').onclick=()=>{$('endOverlay').hidden=true;startHole(HOLES.indexOf(hole))};
 $('mapBtn').onclick=()=>{if(mapMode||look){mapMode=false;look=null}else{mapMode=true}syncMapBtn()};
@@ -234,7 +234,8 @@ $('sheetClose').onclick=()=>{$('sheet').hidden=true;clearInterval(dlg.timer);dlg
 $('sheetPlay').onclick=()=>{const i=HOLES.findIndex(h=>h.num===selNum);if(i<0)return;closeMap();startHole(i)};
 $('openMapBtn').onclick=openMap;$('endMapBtn').onclick=openMap;$('courseBtn').onclick=openMap;
 document.querySelectorAll('.loft button').forEach(b=>b.onclick=()=>{loft=+b.dataset.loft;document.querySelectorAll('.loft button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
-$('mapMenuBtn').onclick=()=>{closeMap();$('introOverlay').hidden=false};
+// Menu from the map: keep the course map behind the menu instead of jumping to a hole.
+$('mapMenuBtn').onclick=()=>{$('sheet').hidden=true;clearInterval(dlg.timer);dlg.timer=null;for(const k in markBtns)markBtns[k].classList.remove('sel');$('introOverlay').hidden=false};
 addEventListener('resize',()=>{if(mapEl.classList.contains('open'))mapApply()});
 
 function w2s(x,y){return[(x-cam.x)*scale+W/2,(y-cam.y)*scale+H/2]}
