@@ -16,7 +16,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let baseScale=1,fitScale=1,scale=0,mapMode=false,W=0,H=0,dpr=1,cam={x:0,y:0};
-let wind={ax:0,ay:0,kmh:0},ball,strokes,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0;
+let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0;
 
 function startHole(i){
   hole=HOLES[i];document.body.style.background=hole.bg;
