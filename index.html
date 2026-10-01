@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blue Bay Pin: Christmas golf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@400;500&family=Pixelify+Sans:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game">
+  <canvas id="c" aria-label="Golf hole seen from above. Pull back anywhere to shoot, use two fingers or scroll to look around."></canvas>
+  <div class="hud"><div class="pill"><b id="strokes">Shot 1</b><span id="info"></span></div></div>
+  <div class="pill windpill" aria-live="polite"><svg viewBox="0 0 24 24" id="windArrow" aria-hidden="true"><path d="M12 2 L19 12 L14 12 L14 22 L10 22 L10 12 L5 12 Z" fill="#E8892B"/></svg><span><b id="windSpeed">0</b>km/h wind</span></div>
+  <button class="mapbtn" id="mapBtn" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg><span id="mapLabel">See the hole</span></button>
+  <div class="loft" role="group" aria-label="Shot height">
+    <button data-loft="2" aria-pressed="false"><svg viewBox="0 0 26 16" aria-hidden="true"><path d="M2 15 Q13 -9 24 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.5 2.5"/></svg>High</button>
+    <button data-loft="1" aria-pressed="true"><svg viewBox="0 0 26 16" aria-hidden="true"><path d="M2 15 Q13 1 24 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.5 2.5"/></svg>Mid</button>
+    <button data-loft="0" aria-pressed="false"><svg viewBox="0 0 26 16" aria-hidden="true"><path d="M2 15 Q13 8 24 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.5 2.5"/></svg>Low</button>
+  </div>
+  <button class="mapbtn coursebtn" id="courseBtn"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 21V4"/><path d="M5 4h11l-2.5 3.5L16 11H5"/></svg><span>Course</span></button>
+  <div class="hint" id="hint">Pull back anywhere to shoot. Use two fingers to look around.</div>
+  <div class="toast" id="toast"></div>
+
+  <div id="courseMap" aria-label="Blue Bay course map. Drag to move, pinch or scroll to zoom, tap a hole number.">
+    <div id="mapLayer"><img alt="" src="assets/course-map.jpg"></div>
+    <div id="marks"></div>
+    <div class="maphead"><div class="brand"><img class="maplogo" alt="Blue Bay Curaçao Golf &amp; Beach Resort" src="assets/blue-bay-logo.png"><div class="pill maptip">Tap a blue hole to play</div></div><button id="mapMenuBtn">Menu</button></div>
+    <div class="sheet" id="sheet" hidden>
+      <img class="proimg" id="proImg" alt="Steffen Kefer, Blue Bay golf pro" src="assets/steffen.png">
+      <div class="dlg" id="dlg" role="button" tabindex="0" aria-label="Next tip">
+        <span class="tag">Steffen Kefer</span>
+        <p id="dlgText" aria-live="polite"></p>
+        <span class="more" id="dlgMore" aria-hidden="true"></span>
+      </div>
+      <div class="holebar">
+        <h2 id="sheetTitle">Hole 1</h2>
+        <span class="stat"><small>PAR</small><b id="statPar">4</b></span>
+        <span class="stat"><small>HCP</small><b id="statHcp">11</b></span>
+        <button class="btn primary" id="sheetPlay">Play this hole</button>
+      </div>
+      <button class="sheetclose" id="sheetClose" aria-label="Close">&times;</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="introOverlay">
+    <div class="card intro">
+      <p class="kicker">Blue Bay, Christmas challenge</p>
+      <h1>Closest to the pin</h1>
+      <p>Pull back anywhere on the screen with one finger and let go. Use two fingers to move around the hole.</p>
+      <button class="btn primary" id="openMapBtn" style="margin:0 0 8px">Choose a hole on the course map</button>
+      <button class="btn ghost" id="howBtn" style="margin:0 0 14px">How to play, with Steffen</button>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 4px">Or jump straight in:</p>
+      <button class="holepick" data-hole="0"><span><b>Hole 1</b>The opener along the beach</span><span class="par">Par 4</span></button>
+      <button class="holepick" data-hole="1"><span><b>Hole 2</b>A long par 5 between the trees</span><span class="par">Par 5</span></button>
+      <button class="holepick" data-hole="2"><span><b>Hole 3</b>A short par 3 to a guarded green</span><span class="par">Par 3</span></button>
+      <button class="holepick" data-hole="3"><span><b>Hole 4</b>Thread the bunkers off the tee</span><span class="par">Par 4</span></button>
+      <button class="holepick" data-hole="4"><span><b>Hole 6</b>The signature carry over the waves</span><span class="par">Par 3</span></button>
+      <button class="holepick" data-hole="5"><span><b>Hole 7</b>Tree-lined all the way to the green</span><span class="par">Par 4</span></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="endOverlay" hidden>
+    <div class="card">
+      <p class="kicker" id="endKicker"></p>
+      <p class="score" id="endScore">4</p>
+      <p class="name" id="endName">Par</p>
+      <p class="line" id="endLine"></p>
+      <button class="btn primary" id="nextBtn">Play hole 7</button>
+      <button class="btn ghost" id="endMapBtn">Back to the course map</button>
+      <button class="btn ghost" id="shareBtn">Share my score</button>
+      <a class="btn ghost" href="https://bluebay-curacao.com/holidays/" target="_blank" rel="noopener">See holiday events</a>
+      <button class="btn ghost" id="againBtn">Play again</button>
+      <p class="note">Prototype. In the live version the AI writes this line from your shot and your home city's weather.</p>
+    </div>
+  </div>
+
+  <div id="tut" hidden>
+    <div id="tutCatch"></div>
+    <div id="tutSpot" hidden></div>
+    <div id="tutFinger" hidden></div>
+    <div class="tut-panel">
+      <img class="tut-pro" src="assets/steffen.png" alt="">
+      <div class="dlg tut-dlg" id="tutDlg" role="button" tabindex="0" aria-label="Continue">
+        <span class="tag">Steffen Kefer</span>
+        <p id="tutText" aria-live="polite"></p>
+        <span class="tut-hint" id="tutHint" hidden>Tap here to skip this step</span>
+        <span class="more" id="tutMore" aria-hidden="true"></span>
+      </div>
+      <button class="tut-skip" id="tutSkip">Skip tutorial</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/masks/hole-1.js"></script>
+<script src="assets/masks/hole-2.js"></script>
+<script src="assets/masks/hole-3.js"></script>
+<script src="assets/masks/hole-4.js"></script>
+<script src="assets/masks/hole-6.js"></script>
+<script src="assets/masks/hole-7.js"></script>
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+<script src="js/tutorial.js"></script>
+</body>
+</html>

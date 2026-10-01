@@ -1,0 +1,4 @@
+.DS_Store
+dist/
+tools/preview-*.png
+__pycache__/
