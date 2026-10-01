@@ -12,7 +12,7 @@ function markSeen(){try{localStorage.setItem(KEY,'1')}catch(e){}}
 // spot: CSS selector to highlight. wait: game event that moves the tutorial on.
 const STEPS=[
   {mode:'talk',layout:'bottom',text:"Welcome to Blue Bay! I'm Steffen, the golf pro here. Let me show you how it works."},
-  {mode:'talk',layout:'top',demo:true,text:"To hit the ball, put one finger anywhere on the screen and pull back. The further you pull, the harder you hit."},
+  {mode:'talk',layout:'top',demo:true,text:"To hit the ball, put one finger anywhere on the screen and pull back. The further you pull, the harder you hit. Changed your mind? Slide back to the ✕ where you started and let go."},
   {mode:'do',layout:'top',wait:'stopped',text:"Your turn! Pull back anywhere and let go."},
   {mode:'talk',layout:'bottom',text:"Nice! The dotted arc shows your shot in calm air. Use it to aim around trouble.",penaltyText:"Ouch, that one found trouble. No worries: the dotted arc shows your shot in calm air, so use it to aim around hazards."},
   {mode:'do',layout:'top',wait:'look',text:"Want to look ahead? Slide two fingers across the screen. On a computer, just scroll.",skipHint:true},

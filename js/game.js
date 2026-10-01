@@ -76,13 +76,16 @@ function launch(d){const L=LOFTS[loft];const v=Math.sqrt(eff(d.p)*LIE_POWER[lieA
 // Where the shot lands in calm air. The aim guide shows only this, so reading the wind is up to the player.
 function landing(d){const s=isPutt()?predict(d.p):launch(d).hv*launch(d).T;return{x:ball.x+d.ux*s,y:ball.y+d.uy*s}}
 function predict(p){p=eff(p);return isPutt()?Math.pow(p*PUTT0,2)*hole.k/(2*ROLL[S.GREEN]):p*CARRY0*hole.k*LIE_POWER[lieAt(ball.x,ball.y)]*LOFTS[loft].c}
+// Pulling starts outside a small circle around the touch point. Sliding back into it cancels the shot.
+const CANCEL_R=36;
 function dragInfo(){
   if(!drag)return null;
   const dx=drag.sx-drag.cx,dy=drag.sy-drag.cy,len=Math.hypot(dx,dy);
-  const p=Math.min(len/(Math.min(W,H)*0.42),1);
-  if(len<4)return{p:0,ux:0,uy:0};
-  return{p:p,ux:dx/len,uy:dy/len};
+  if(len<CANCEL_R)return{p:0,ux:0,uy:0,cancel:!!drag.armed&&!drag.demo};
+  drag.armed=true;
+  return{p:Math.min((len-CANCEL_R)/(Math.min(W,H)*0.42),1),ux:dx/len,uy:dy/len};
 }
+function cancelAim(){if(!drag||drag.demo)return;const armed=drag.armed;drag=null;$('hint').style.opacity=1;if(armed)toast('Shot cancelled.')}
 function syncMapBtn(){const away=mapMode||look;$('mapBtn').setAttribute('aria-pressed',!!away);$('mapLabel').textContent=away?'Back to the ball':'See the hole'}
 
 const pts=new Map();let lockAim=false;
@@ -90,6 +93,7 @@ function mid(){let x=0,y=0;pts.forEach(p=>{x+=p.x;y+=p.y});return{x:x/pts.size,y
 function startPan(){drag=null;if(!look)look={x:cam.x,y:cam.y};pan=mid();syncMapBtn();emit('look')}
 cv.addEventListener('pointerdown',e=>{
   if(state==='intro'||state==='done')return;
+  if(e.button>0){cancelAim();return}
   cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size>=2){lockAim=true;startPan();return}
   if(state==='ready'&&!lockAim){drag={sx:e.clientX,sy:e.clientY,cx:e.clientX,cy:e.clientY};$('hint').style.opacity=0}
@@ -103,10 +107,12 @@ function up(e){
   pts.delete(e.pointerId);
   if(pan){if(pts.size<2)pan=null;if(pts.size===0)lockAim=false;return}
   if(pts.size===0)lockAim=false;
-  if(!drag)return;const d=dragInfo();drag=null;
-  if(e.type==='pointercancel'||!d||d.p<0.05){$('hint').style.opacity=1;return}
+  if(!drag)return;const armed=drag.armed,d=dragInfo();drag=null;
+  if(e.type==='pointercancel'||!d||d.p<0.05){$('hint').style.opacity=1;if(armed&&e.type!=='pointercancel')toast('Shot cancelled.');return}
   look=null;mapMode=false;syncMapBtn();shoot(d);
 }
+cv.addEventListener('contextmenu',e=>{e.preventDefault();cancelAim()});
+addEventListener('keydown',e=>{if(e.key==='Escape')cancelAim()});
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('wheel',e=>{e.preventDefault();if(state==='intro'||state==='done')return;if(!look)look={x:cam.x,y:cam.y};look.x+=e.deltaX/scale;look.y+=e.deltaY/scale;syncMapBtn();emit('look')},{passive:false});
 
@@ -298,6 +304,14 @@ function draw(dt){
     ctx.fillStyle=col==='#FFFFFF'?'#F4ECDD':col;ctx.fillText(label,b[0],b[1]-R-22);
     ctx.font='500 12px Outfit, system-ui, sans-serif';ctx.fillStyle='#FFFFFF';{const cm=Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m;ctx.fillText(putt?'Putt, about '+Math.max(1,Math.round(cm))+' m':LOFTS[loft].n+' shot, ~'+Math.round(cm/5)*5+' m, no wind',b[0],b[1]+R+16)}
   }
+  if(drag&&drag.armed&&!drag.demo&&state==='ready'){
+    const r=cv.getBoundingClientRect(),sx=drag.sx-r.left,sy=drag.sy-r.top,inside=d&&d.cancel,k=7;
+    ctx.save();ctx.fillStyle=inside?'rgba(224,68,58,.92)':'rgba(30,42,99,.6)';ctx.beginPath();ctx.arc(sx,sy,inside?24:20,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx-k,sy-k);ctx.lineTo(sx+k,sy+k);ctx.moveTo(sx+k,sy-k);ctx.lineTo(sx-k,sy+k);ctx.stroke();
+    if(inside){const lbl='Release to cancel';ctx.font='500 13px Outfit, system-ui, sans-serif';const tw=ctx.measureText(lbl).width+18;
+      ctx.fillStyle='rgba(30,42,99,.92)';roundRect(sx-tw/2,sy-60,tw,26,13);ctx.fill();ctx.fillStyle='#F4ECDD';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,sx,sy-47)}
+    ctx.restore();
+  }
   if(state==='ready'&&!(d&&d.p>0)){const pr=reduceMotion?0.5:(Math.sin(performance.now()/350)+1)/2;ctx.strokeStyle='rgba(232,137,43,'+(0.45+pr*0.45)+')';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(b[0],b[1],Math.max(BALL_R*scale*3,26)-6+pr*4,0,Math.PI*2);ctx.stroke()}
   if(state==='moving'||state==='sinking'){
     if(aimMark){const a=w2s(aimMark.x,aimMark.y);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);ctx.stroke();ctx.restore()}
@@ -325,7 +339,7 @@ window.BB={
   get state(){return state},get hole(){return hole},
   ballScreen(){const r=cv.getBoundingClientRect(),s=w2s(ball.x,ball.y);return{x:s[0]+r.left,y:s[1]+r.top}},
   pinScreen(){const r=cv.getBoundingClientRect(),s=w2s(hole.pin.x,hole.pin.y);return{x:s[0]+r.left,y:s[1]+r.top}},
-  demoDrag(dx,dy){const b=this.ballScreen();drag={sx:b.x,sy:b.y,cx:b.x+dx,cy:b.y+dy}},
+  demoDrag(dx,dy){const b=this.ballScreen(),l=Math.hypot(dx,dy),k=l>1?(l+CANCEL_R)/l:0;drag={sx:b.x,sy:b.y,cx:b.x+dx*k,cy:b.y+dy*k,demo:true}},
   clearDrag(){drag=null},
   demoNoZoom:false,
   startHole(num){const i=HOLES.findIndex(h=>h.num===num);if(i>=0){$('introOverlay').hidden=true;closeMap();startHole(i)}},
