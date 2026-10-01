@@ -6,6 +6,7 @@ const REST=[0,.10,.05,.01,.06,.16,0,0];
 const GRIP=[0,.42,.26,.06,.40,.58,0,0];
 const LIE_POWER=[1,1,.82,.55,1,.95,1,1];
 const G0=600, ANGLE=0.55, SPEED0=610, CARRY0=SPEED0*SPEED0*Math.sin(2*ANGLE)/G0, PUTT0=230, BALL_R=8, HOLE_R=8;
+const WIND_FX=1.5, CUP_SPEED=55; // wind push multiplier; a putt drops only below this speed (x sqrt k), about 2.5 m of roll past the cup
 function decode(s){const m=new Uint8Array(s.length);for(let i=0;i<s.length;i++)m[i]=s.charCodeAt(i)-48;return m}
 const HOLES=window.BB_DATA.holes.map(h=>Object.assign(h,{mask:decode(window.BB_MASKS[h.num])}));
 HOLES.forEach(h=>{h.img=new Image();h.img.src=h.src});
@@ -17,14 +18,21 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let baseScale=1,fitScale=1,scale=0,mapMode=false,W=0,H=0,dpr=1,cam={x:0,y:0};
-let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0;
+let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0,trail=[],aimMark=null;
 
+// Wind is the same for every player: seeded by the hole and today's date in Curacao (UTC-4).
+// Inland holes get 10-20 km/h, holes on the sea up to ~38 km/h. Later the backend can hand out this seed.
+function dayKey(){return new Date(Date.now()-4*3600e3).toISOString().slice(0,10)}
+function seeded(str){let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);
+  return function(){h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return((h^(h>>>14))>>>0)/4294967296}}
+function dailyWind(num){const r=seeded('bb-wind/'+dayKey()+'/'+num),ex=window.BB_DATA.exposure[num]||0;
+  const wa=r()*Math.PI*2,kmh=Math.round(10+r()*10+ex*(8+r()*10)),a=kmh*3.6*WIND_FX;return{ax:Math.cos(wa)*a,ay:Math.sin(wa)*a,kmh:kmh,wa:wa}}
 function startHole(i){
   hole=HOLES[i];document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
   strokes=0;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
-  const wa=Math.random()*Math.PI*2,kmh=6+Math.round(Math.random()*20);wind={ax:Math.cos(wa)*kmh*3.6,ay:Math.sin(wa)*kmh*3.6,kmh:kmh};
-  $('windSpeed').textContent=kmh;$('windArrow').style.transform='rotate('+(wa*180/Math.PI+90)+'deg)';
+  wind=dailyWind(hole.num);trail=[];aimMark=null;
+  $('windSpeed').textContent=wind.kmh;$('windArrow').style.transform='rotate('+(wind.wa*180/Math.PI+90)+'deg)';
   scale=0;resize();cam.x=ball.x;cam.y=ball.y;updateHud();$('hint').style.opacity=1;
 }
 function updateHud(){
@@ -47,7 +55,8 @@ function isPutt(){return lieAt(ball.x,ball.y)===S.GREEN}
 function eff(p){return Math.pow(p,1.35)}
 const LOFTS=[{n:'Low',a:0.36,c:1.0,g:1.0},{n:'Mid',a:0.55,c:1.0,g:0.72},{n:'High',a:0.9,c:0.85,g:0.4}];let loft=1;
 function launch(d){const L=LOFTS[loft];const v=Math.sqrt(eff(d.p)*LIE_POWER[lieAt(ball.x,ball.y)]*L.c*Math.sin(2*ANGLE)/Math.sin(2*L.a))*SPEED0*Math.sqrt(hole.k);return{hv:v*Math.cos(L.a),vz:v*Math.sin(L.a),T:2*v*Math.sin(L.a)/G0,g:L.g}}
-function landing(d){if(isPutt()){const s=predict(d.p);return{x:ball.x+d.ux*s,y:ball.y+d.uy*s}}const L=launch(d);return{x:ball.x+d.ux*L.hv*L.T+0.5*wind.ax*L.T*L.T,y:ball.y+d.uy*L.hv*L.T+0.5*wind.ay*L.T*L.T}}
+// Where the shot lands in calm air. The aim guide shows only this, so reading the wind is up to the player.
+function landing(d){const s=isPutt()?predict(d.p):launch(d).hv*launch(d).T;return{x:ball.x+d.ux*s,y:ball.y+d.uy*s}}
 function predict(p){p=eff(p);return isPutt()?Math.pow(p*PUTT0,2)*hole.k/(2*ROLL[S.GREEN]):p*CARRY0*hole.k*LIE_POWER[lieAt(ball.x,ball.y)]*LOFTS[loft].c}
 function dragInfo(){
   if(!drag)return null;
@@ -84,7 +93,7 @@ cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('wheel',e=>{e.preventDefault();if(state==='intro'||state==='done')return;if(!look)look={x:cam.x,y:cam.y};look.x+=e.deltaX/scale;look.y+=e.deltaY/scale;syncMapBtn();emit('look')},{passive:false});
 
 function shoot(d){
-  strokes++;last={x:ball.x,y:ball.y};const k=hole.k;
+  strokes++;last={x:ball.x,y:ball.y};const k=hole.k;trail=[];aimMark=isPutt()?null:landing(d);
   if(isPutt()){
     const v=eff(d.p)*PUTT0*Math.sqrt(k);ball.vx=d.ux*v;ball.vy=d.uy*v;ball.vz=0;ball.air=false;
   }else{
@@ -97,7 +106,7 @@ function penalty(lie){
   const toDrop=hole.drop&&(lie===S.WATER||lie===S.ROCKS);
   const msg=lie===S.WATER?'Splash. One-stroke penalty':lie===S.ROCKS?'Off the rocks and gone. One-stroke penalty':'Into the trees. One-stroke penalty';
   toast(msg+(toDrop?', playing from the drop zone.':'.'));
-  const p=toDrop?hole.drop:last;ball.x=p.x;ball.y=p.y;ball.vx=ball.vy=ball.vz=0;ball.z=0;ball.air=false;state='ready';updateHud();emit('stopped',{penalty:true});
+  const p=toDrop?hole.drop:last;ball.x=p.x;ball.y=p.y;ball.vx=ball.vy=ball.vz=0;ball.z=0;ball.air=false;state='ready';aimMark=null;updateHud();emit('stopped',{penalty:true});
 }
 function hazard(l){return l===S.TREES||l===S.WATER||l===S.ROCKS}
 function step(dt){
@@ -105,6 +114,7 @@ function step(dt){
   if(state==='moving'){
     const dh=Math.hypot(hole.pin.x-ball.x,hole.pin.y-ball.y);
     if(ball.air){
+      if(!trail.length||Math.hypot(ball.x-trail[trail.length-1].x,ball.y-trail[trail.length-1].y)>14)trail.push({x:ball.x,y:ball.y,z:ball.z});
       ball.vz-=G*dt;ball.vx+=wind.ax*dt;ball.vy+=wind.ay*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.z+=ball.vz*dt;
       if(ball.z<=0){
         ball.z=0;const lie=lieAt(ball.x,ball.y);
@@ -123,11 +133,12 @@ function step(dt){
     if(hazard(lie)){penalty(lie);return}
     const sp=Math.hypot(ball.vx,ball.vy);
     if(dh<HOLE_R){
-      if(sp<260*Math.sqrt(k)){sink();return}
-      const nx=(ball.x-hole.pin.x)/dh||0,ny=(ball.y-hole.pin.y)/dh||0;ball.vx=(ball.vx+nx*50)*0.75;ball.vy=(ball.vy+ny*50)*0.75;
+      if(sp<CUP_SPEED*Math.sqrt(k)){sink();return}
+      const nx=(ball.x-hole.pin.x)/dh||0,ny=(ball.y-hole.pin.y)/dh||0;ball.vx+=nx*400*dt;ball.vy+=ny*400*dt;
+      const ns=Math.hypot(ball.vx,ball.vy)||1;ball.vx*=sp/ns;ball.vy*=sp/ns;
     }
     const f=ROLL[lie]*dt;
-    if(sp<=f||sp<2){ball.vx=ball.vy=0;state='ready';updateHud();emit('stopped',{lie:lie});
+    if(sp<=f||sp<2){ball.vx=ball.vy=0;state='ready';aimMark=null;updateHud();emit('stopped',{lie:lie});
       if(lie===S.GREEN)toast(Math.round(dh*hole.m*10)/10+' m from the pin');
       return}
     ball.vx-=ball.vx/sp*f;ball.vy-=ball.vy/sp*f;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
@@ -248,17 +259,17 @@ function draw(dt){
     const col=d.p<0.6?'#FFFFFF':d.p<0.92?'#E8892B':'#E0443A';
     const lp=landing(d),e=w2s(lp.x,lp.y);
     if(putt){
-      ctx.save();ctx.setLineDash([2,9]);ctx.lineCap='round';ctx.lineWidth=4;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(e[0],e[1]);ctx.stroke();ctx.restore();
+      ctx.save();ctx.setLineDash([2,9]);ctx.lineCap='round';ctx.lineWidth=4;ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(b[0]+d.ux*(40+60*d.p),b[1]+d.uy*(40+60*d.p));ctx.stroke();ctx.restore();
     }else{
-      ctx.save();ctx.setLineDash([2,8]);ctx.lineCap='round';ctx.lineWidth=2;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.moveTo(b[0],b[1]);{const L0=launch(d);for(let i=1;i<=20;i++){const tt=L0.T*i/20,s=w2s(ball.x+d.ux*L0.hv*tt+0.5*wind.ax*tt*tt,ball.y+d.uy*L0.hv*tt+0.5*wind.ay*tt*tt);ctx.lineTo(s[0],s[1])}}ctx.stroke();ctx.restore();
+      ctx.save();ctx.setLineDash([2,8]);ctx.lineCap='round';ctx.lineWidth=2;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.moveTo(b[0],b[1]);{const L0=launch(d);for(let i=1;i<=20;i++){const tt=L0.T*i/20,s=w2s(ball.x+d.ux*L0.hv*tt,ball.y+d.uy*L0.hv*tt);ctx.lineTo(s[0],s[1])}}ctx.stroke();ctx.restore();
       const L=launch(d),hv=L.hv,vz=L.vz,T=L.T;
       const n=Math.max(8,Math.round(Math.hypot(e[0]-b[0],e[1]-b[1])/11));
-      for(let i=1;i<n;i++){const tt=T*i/n,x=ball.x+d.ux*hv*tt+0.5*wind.ax*tt*tt,y=ball.y+d.uy*hv*tt+0.5*wind.ay*tt*tt,z=(vz*tt-G0*tt*tt/2)/hole.k,s=w2s(x,y);
+      for(let i=1;i<n;i++){const tt=T*i/n,x=ball.x+d.ux*hv*tt,y=ball.y+d.uy*hv*tt,z=(vz*tt-G0*tt*tt/2)/hole.k,s=w2s(x,y);
         const rr=2.2+1.6*(z/(vz*vz/(2*G0)/hole.k||1));
         ctx.fillStyle='rgba(30,42,99,.35)';ctx.beginPath();ctx.arc(s[0]+1,s[1]-z*scale+1.5,rr,0,Math.PI*2);ctx.fill();
         ctx.fillStyle=col;ctx.beginPath();ctx.arc(s[0],s[1]-z*scale,rr,0,Math.PI*2);ctx.fill()}
     }
-    if(!putt){ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(e[0],e[1],10,0,Math.PI*2);ctx.stroke()}
+    if(!putt){ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();ctx.arc(e[0],e[1],Math.max(12,Math.hypot(lp.x-ball.x,lp.y-ball.y)*0.06*scale),0,Math.PI*2);ctx.stroke();ctx.restore()}
     ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(b[0]-d.ux*d.p*60,b[1]-d.uy*d.p*60);ctx.stroke();
     const R=26;ctx.lineWidth=6;ctx.strokeStyle='rgba(30,42,99,.55)';ctx.beginPath();ctx.arc(b[0],b[1],R,0,Math.PI*2);ctx.stroke();
     ctx.strokeStyle=col;ctx.beginPath();ctx.arc(b[0],b[1],R,-Math.PI/2,-Math.PI/2+Math.PI*2*d.p);ctx.stroke();
@@ -266,9 +277,13 @@ function draw(dt){
     ctx.font='600 16px Fraunces, Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';
     const tw=ctx.measureText(label).width+16;ctx.fillStyle='rgba(30,42,99,.9)';roundRect(b[0]-tw/2,b[1]-R-34,tw,24,12);ctx.fill();
     ctx.fillStyle=col==='#FFFFFF'?'#F4ECDD':col;ctx.fillText(label,b[0],b[1]-R-22);
-    ctx.font='500 12px Outfit, system-ui, sans-serif';ctx.fillStyle='#FFFFFF';ctx.fillText((putt?'Putt ':LOFTS[loft].n+' shot, carry ')+Math.round(Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m)+' m',b[0],b[1]+R+16);
+    ctx.font='500 12px Outfit, system-ui, sans-serif';ctx.fillStyle='#FFFFFF';{const cm=Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m;ctx.fillText(putt?'Putt, about '+Math.max(1,Math.round(cm))+' m':LOFTS[loft].n+' shot, ~'+Math.round(cm/5)*5+' m, no wind',b[0],b[1]+R+16)}
   }
   if(state==='ready'&&!(d&&d.p>0)){const pr=reduceMotion?0.5:(Math.sin(performance.now()/350)+1)/2;ctx.strokeStyle='rgba(232,137,43,'+(0.45+pr*0.45)+')';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(b[0],b[1],Math.max(BALL_R*scale*3,26)-6+pr*4,0,Math.PI*2);ctx.stroke()}
+  if(state==='moving'||state==='sinking'){
+    if(aimMark){const a=w2s(aimMark.x,aimMark.y);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);ctx.stroke();ctx.restore()}
+    ctx.fillStyle='rgba(255,255,255,.55)';for(const t of trail){const s=w2s(t.x,t.y);ctx.beginPath();ctx.arc(s[0],s[1]-t.z/hole.k*scale,2,0,Math.PI*2);ctx.fill()}
+  }
   if(state!=='done'){
     const zs=ball.z/hole.k;
     const r=BALL_R*scale*(1+zs/320)*ball.scale;

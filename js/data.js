@@ -23,6 +23,8 @@ window.BB_DATA.holes=[
 // Course map: marker position per hole (px in assets/course-map.jpg), scorecard [par, yards], handicap, Steffen tips.
 window.BB_DATA.marks={1:[778,570],2:[710,464],3:[696,343],4:[468,413],5:[251,540],6:[205,623],7:[192,515],8:[588,303],9:[882,324],10:[953,326],11:[1034,216],12:[1243,280],13:[1094,435],14:[1089,515],15:[1135,750],16:[1041,998],17:[959,930],18:[864,538]};
 window.BB_DATA.card={1:[4,410],2:[5,510],3:[3,145],4:[4,395],5:[4,320],6:[3,180],7:[4,385],8:[5,530],9:[4,395],10:[4,365],11:[4,340],12:[3,160],13:[4,330],14:[4,340],15:[5,490],16:[4,365],17:[3,140],18:[5,490]};
+// Wind exposure per hole, from the course map: 1 = right on the sea (cliffs, open coast), 0 = sheltered inland.
+window.BB_DATA.exposure={1:0,2:0,3:.2,4:.2,5:.5,6:1,7:.7,8:.7,9:0,10:0,11:.4,12:.7,13:.2,14:.2,15:.7,16:1,17:1,18:0};
 window.BB_DATA.hcp={1:11,2:13,3:17,4:7,5:15,6:9,7:3,8:5,9:1,10:8,11:6,12:14,13:18,14:10,15:12,16:4,17:16,18:2};
 window.BB_DATA.tips={
  1:["Hole 1, a friendly par 4 to get you started.","There's a body of water along the left, and the sandy edge beside it plays like one big bunker. Aim down the right half of the fairway.","Don't drift too far right, though. The trees there will cost you a stroke. Two solid shots and you're on the green."],

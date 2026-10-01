@@ -35,8 +35,17 @@ tools/bundle.py       Packs everything into one HTML file in dist/
    (`m` = real length / tee-to-pin distance in px) and `k` (so a full shot carries about 175 m:
    `k = (175 / m) / 553`).
 4. Add Steffen's tips for it under `window.BB_DATA.tips`.
+   Check its wind exposure in `window.BB_DATA.exposure` (1 = on the sea, 0 = sheltered).
 5. Add `<script src="assets/masks/hole-N.js"></script>` to `index.html`, plus a quick-pick
    button in the menu if you want one.
+
+## Wind and aiming
+
+Wind is the same for every player on a given day: it is seeded from the hole number and the
+date in Curaçao (`dailyWind` in `js/game.js`). Holes on the coast get stronger wind
+(`BB_DATA.exposure`), and `WIND_FX` sets how hard it pushes the ball. The aim guide shows the
+shot in calm air only, so players have to allow for the wind themselves. Putts show a direction
+and a rough distance, and only drop when they reach the cup slowly enough (`CUP_SPEED`).
 
 ## Tutorial
 
