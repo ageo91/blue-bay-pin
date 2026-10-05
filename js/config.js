@@ -1,7 +1,4 @@
-// Leaderboard backend (Supabase). Leave empty to run the game without a leaderboard.
-// supabaseKey is the project's public "anon" / publishable key: it is meant to ship in the page, and the
-// database rules in supabase/leaderboard.sql decide what it can do. Never put the service_role / secret key here.
+// Leaderboard API: the Cloudflare Worker in worker/. Leave apiUrl empty to run the game without a leaderboard.
 window.BB_CONFIG={
-  supabaseUrl:'',
-  supabaseKey:''
+  apiUrl:'https://blue-bay-pin-leaderboard.ao-creative91.workers.dev'
 };

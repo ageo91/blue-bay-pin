@@ -1,36 +1,35 @@
-// Today's leaderboard, per hole. No account: the first time a player posts a score we sign them in
-// anonymously (Supabase) and they pick a name, shown as Name#1234. Database setup: supabase/leaderboard.sql.
-// Listens to bb:holed from js/game.js. Hidden entirely when js/config.js has no Supabase details.
+// Today's leaderboard, per hole. No account: the first time a player posts a score they pick a name,
+// shown as Name#1234, and the API gives this device a secret token (kept in localStorage).
+// API: worker/ (Cloudflare Worker + D1). Listens to bb:holed from js/game.js. Hidden when js/config.js has no apiUrl.
 (function(){
 const $=id=>document.getElementById(id);
 const cfg=window.BB_CONFIG||{};
-const on=!!(cfg.supabaseUrl&&cfg.supabaseKey&&window.supabase);
+const API=(cfg.apiUrl||'').replace(/\/$/,''),on=!!API;
 document.querySelectorAll('[data-lb]').forEach(el=>el.hidden=!on);
 if(!on)return;
 
-const sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseKey,{auth:{persistSession:true,storageKey:'bb_auth'}});
-const NAME_OK=/^[A-Za-z0-9_ ]{3,16}$/;
+const NAME_OK=/^[A-Za-z0-9_ ]{3,16}$/,TOKEN='bb_token';
 let me=null,pending=null,shown=null;
 
-async function userId(){const {data}=await sb.auth.getSession();return data.session?data.session.user.id:null}
-async function signIn(){if(await userId())return;const {error}=await sb.auth.signInAnonymously();if(error)throw error}
-async function loadMe(){const id=await userId();if(!id)return null;
-  const {data}=await sb.from('players').select('name,tag').eq('user_id',id).maybeSingle();me=data;return me}
-async function pickName(name){
-  await signIn();
-  for(let i=0;i<4;i++){   // the #tag is random; on the rare clash, just try again
-    const {data,error}=await sb.from('players').insert({name:name}).select('name,tag').single();
-    if(!error){me=data;return me}
-    if(error.code!=='23505')throw error}
-  throw new Error('name_taken');
-}
-async function submit(s){const {data,error}=await sb.rpc('submit_score',{p_hole:s.num,p_strokes:s.strokes,p_best_m:s.best_m});if(error)throw error;return data&&data[0]}
-async function board(num){const {data,error}=await sb.rpc('leaderboard',{p_hole:num});if(error)throw error;return data||[]}
+function token(){try{return localStorage.getItem(TOKEN)}catch(e){return null}}
+async function call(method,path,data){
+  const h={'Content-Type':'application/json'},t=token();if(t)h.Authorization='Bearer '+t;
+  const r=await fetch(API+path,{method:method,headers:h,body:data?JSON.stringify(data):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'http_'+r.status);return j}
+async function loadMe(){if(!token())return null;try{me=await call('GET','/me')}catch(e){me=null}return me}
+async function pickName(name){const j=await call('POST','/player',{name:name});
+  if(j.token)try{localStorage.setItem(TOKEN,j.token)}catch(e){}
+  me={name:j.name,tag:j.tag};return me}
+async function submit(s){return call('POST','/score',{hole:s.num,strokes:s.strokes,best_m:s.best_m})}
+async function board(num){return (await call('GET','/board?hole='+num)).rows}
 
 function errText(e){const m=(e&&e.message)||'';
   if(/name_not_allowed/.test(m))return "That name isn't allowed. Try another one.";
   if(/too_fast/.test(m))return 'Hold on a few seconds, then try again.';
   if(/name_taken/.test(m))return 'That name is busy right now. Try again.';
+  if(/too_many/.test(m))return 'Too many new names from this connection. Try again later.';
+  if(/bad_name/.test(m))return 'Use 3 to 16 letters, numbers, spaces or _.';
+  if(/no_player/.test(m)){me=null;$('lbJoin').hidden=false;return 'Pick a name to post your score.'}
   return "Couldn't reach the leaderboard. Check your connection and try again."}
 function who(p){return p.name+'#'+p.tag}
 function showResult(r,s){

@@ -1,0 +1,13 @@
+# Blue Bay Pin leaderboard: its own Worker and its own D1 database, separate from any other Cloudflare project.
+name = "blue-bay-pin-leaderboard"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Sites allowed to call the API (comma-separated). Add the launch domain here.
+ALLOWED_ORIGINS = "https://ageo91.github.io,http://localhost:8765"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "blue-bay-pin"
+database_id = "7da7a459-106b-4a00-a903-c68b815f1da3"
