@@ -18,7 +18,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let baseScale=1,fitScale=1,scale=0,mapMode=false,W=0,H=0,dpr=1,cam={x:0,y:0};
-let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0,trail=[],aimMark=null;
+let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0,trail=[],aimMark=null,closest=Infinity;
 
 // Wind is the same for every player: seeded by the hole and today's date in Curacao (UTC-4).
 // Inland holes get 10-20 km/h, holes on the sea up to ~38 km/h. Later the backend can hand out this seed.
@@ -47,7 +47,7 @@ function windTip(num){const r=windRead(num);if(!r)return null;
 function startHole(i){
   hole=HOLES[i];document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
-  strokes=0;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
+  strokes=0;closest=Infinity;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
   wind=dailyWind(hole.num);trail=[];aimMark=null;
   $('windSpeed').textContent=wind.kmh;$('windArrow').style.transform='rotate('+(wind.wa*180/Math.PI+90)+'deg)';
   scale=0;resize();cam.x=ball.x;cam.y=ball.y;updateHud();$('hint').style.opacity=1;
@@ -116,7 +116,9 @@ addEventListener('keydown',e=>{if(e.key==='Escape')cancelAim()});
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('wheel',e=>{e.preventDefault();if(state==='intro'||state==='done')return;if(!look)look={x:cam.x,y:cam.y};look.x+=e.deltaX/scale;look.y+=e.deltaY/scale;syncMapBtn();emit('look')},{passive:false});
 
+// closest: nearest the ball came to rest before a shot (tee excluded), the leaderboard tiebreak
 function shoot(d){
+  if(strokes>0)closest=Math.min(closest,Math.hypot(hole.pin.x-ball.x,hole.pin.y-ball.y)*hole.m);
   strokes++;last={x:ball.x,y:ball.y};const k=hole.k;trail=[];aimMark=isPutt()?null:landing(d);
   if(isPutt()){
     const v=eff(d.p)*PUTT0*Math.sqrt(k);ball.vx=d.ux*v;ball.vy=d.uy*v;ball.vz=0;ball.air=false;
@@ -180,7 +182,7 @@ const LINES={
   over:["The palms were cheering for you anyway. Tomorrow's hole is waiting, and so is the beach.","A few extra swings, a few extra minutes in the sun. We'd call that a win."]
 };
 function scoreName(){const d=strokes-hole.par;return strokes===1?'Hole in one':(NAMES[String(d)]||('+'+d))}
-function showEnd(){emit('holed',{strokes:strokes});
+function showEnd(){emit('holed',{num:hole.num,strokes:strokes,best_m:strokes===1||!isFinite(closest)?0:Math.round(closest*10)/10});
   const diff=strokes-hole.par;$('endKicker').textContent='Hole '+hole.num+', par '+hole.par;$('endScore').textContent=strokes;$('endName').textContent=scoreName();
   const pool=diff<0?LINES.great:diff===0?LINES.par:LINES.over;$('endLine').textContent=pool[Math.floor(Math.random()*pool.length)];
   const other=(HOLES.indexOf(hole)+1)%HOLES.length;$('nextBtn').textContent='Play hole '+HOLES[other].num;$('nextBtn').dataset.hole=other;

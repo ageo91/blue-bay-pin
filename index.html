@@ -51,7 +51,8 @@
       <h1>Closest to the pin</h1>
       <p>Pull back anywhere on the screen with one finger and let go. Use two fingers to move around the hole.</p>
       <button class="btn primary" id="openMapBtn" style="margin:0 0 8px">Choose a hole on the course map</button>
-      <button class="btn ghost" id="howBtn" style="margin:0 0 14px">How to play, with Steffen</button>
+      <button class="btn ghost" id="howBtn" style="margin:0 0 8px">How to play, with Steffen</button>
+      <button class="btn ghost" id="lbMenuBtn" data-lb hidden style="margin:0 0 14px">Today's leaderboard</button>
       <p style="font-size:13px;color:var(--muted);margin:0 0 4px">Or jump straight in:</p>
       <button class="holepick" data-hole="0"><span><b>Hole 1</b>The opener along the beach</span><span class="par">Par 4</span></button>
       <button class="holepick" data-hole="1"><span><b>Hole 2</b>A long par 5 between the trees</span><span class="par">Par 5</span></button>
@@ -68,12 +69,34 @@
       <p class="score" id="endScore">4</p>
       <p class="name" id="endName">Par</p>
       <p class="line" id="endLine"></p>
+      <div class="lb" id="lbBox" hidden>
+        <form id="lbJoin" class="lbjoin" hidden>
+          <p class="lbhead">Put your score on today's leaderboard</p>
+          <div class="lbrow"><input id="lbName" maxlength="16" placeholder="Pick a name" autocomplete="nickname" aria-label="Your leaderboard name"><button class="btn primary" type="submit">Post</button></div>
+          <p class="lbsmall">No account needed. Only your name and score are shown.</p>
+        </form>
+        <p class="lbresult" id="lbResult" aria-live="polite" hidden></p>
+        <p class="lberr" id="lbErr" role="alert" hidden></p>
+        <button class="btn ghost" id="lbOpenBtn" type="button">Today's leaderboard</button>
+      </div>
       <button class="btn primary" id="nextBtn">Play hole 7</button>
       <button class="btn ghost" id="endMapBtn">Back to the course map</button>
       <button class="btn ghost" id="shareBtn">Share my score</button>
       <a class="btn ghost" href="https://bluebay-curacao.com/holidays/" target="_blank" rel="noopener">See holiday events</a>
       <button class="btn ghost" id="againBtn">Play again</button>
       <p class="note">Prototype. In the live version the AI writes this line from your shot and your home city's weather.</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="lbOverlay" hidden>
+    <div class="card lbcard" role="dialog" aria-labelledby="lbTitle">
+      <p class="kicker">Today's leaderboard</p>
+      <h2 id="lbTitle">Hole 1</h2>
+      <div class="lbtabs" id="lbTabs" role="tablist" aria-label="Hole"></div>
+      <div class="lbcols" aria-hidden="true"><span>#</span><span>Player</span><span>Strokes</span><span>Closest</span></div>
+      <ol class="lblist" id="lbList"></ol>
+      <p class="note">Fewest strokes wins. Ties go to the shot that stopped closest to the pin. Everyone plays the same wind, and the board resets at midnight Curaçao time.</p>
+      <button class="btn ghost" id="lbClose">Close</button>
     </div>
   </div>
 
@@ -100,9 +123,12 @@
 <script src="assets/masks/hole-4.js"></script>
 <script src="assets/masks/hole-6.js"></script>
 <script src="assets/masks/hole-7.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/steffen.js"></script>
 <script src="js/game.js"></script>
 <script src="js/tutorial.js"></script>
+<script src="js/leaderboard.js"></script>
 </body>
 </html>
