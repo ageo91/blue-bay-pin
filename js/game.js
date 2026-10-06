@@ -37,7 +37,7 @@ function windShort(r){const parts=[];if(r.head)parts.push('into your face');if(r
   return 'Wind '+r.kmh+' km/h, '+(parts.join(' and ')||'swirling')+'.'}
 function windTip(num){const r=windRead(num);if(!r)return null;
   const feel=r.kmh<15?'Just a light breeze today':r.kmh<25?'A steady breeze today':'The wind is really blowing today';
-  const where=r.coast?" We're right on the sea here, so it blows harder than inland.":'';
+  const where=r.coast?" We’re right on the sea here, so it blows harder than inland.":'';
   const tips=[];if(r.push)tips.push('aim a little '+(r.push==='right'?'left':'right')+' of your target');
   if(r.head)tips.push('hit it harder, or keep it low under the wind');if(r.tail)tips.push('ease off, because the ball will fly further');
   if(!tips.length)tips.push('it will move your ball less than you think, so trust your line');
@@ -47,7 +47,7 @@ function windTip(num){const r=windRead(num);if(!r)return null;
 function startHole(i){
   hole=HOLES[i];document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
-  strokes=0;closest=Infinity;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
+  strokes=0;closest=Infinity;kb=null;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
   wind=dailyWind(hole.num);trail=[];aimMark=null;
   $('windSpeed').textContent=wind.kmh;$('windArrow').style.transform='rotate('+(wind.wa*180/Math.PI+90)+'deg)';
   scale=0;resize();cam.x=ball.x;cam.y=ball.y;updateHud();$('hint').style.opacity=1;
@@ -85,7 +85,31 @@ function dragInfo(){
   drag.armed=true;
   return{p:Math.min((len-CANCEL_R)/(Math.min(W,H)*0.42),1),ux:dx/len,uy:dy/len};
 }
-function cancelAim(){if(!drag||drag.demo)return;const armed=drag.armed;drag=null;$('hint').style.opacity=1;if(armed)toast('Shot cancelled.')}
+function cancelAim(){if(!drag||drag.demo)return;const armed=drag.armed;drag=null;kb=null;$('hint').style.opacity=1;if(armed)toast('Shot cancelled.')}
+// Keyboard play: Left/Right aim (Shift for fine steps), Up/Down set power, Space or Enter shoots, Escape cancels.
+// Builds the same drag the touch controls do, so the aim guide, zoom and physics are identical.
+let kb=null;
+function kbReady(){
+  if(state!=='ready'||mapEl.classList.contains('open'))return false;
+  if(['introOverlay','endOverlay','lbOverlay'].some(id=>!$(id).hidden))return false;
+  const a=document.activeElement;return !a||a===document.body||a===cv;
+}
+function kbAim(){const len=CANCEL_R+kb.p*Math.min(W,H)*0.42;drag={sx:0,sy:0,cx:-Math.cos(kb.ang)*len,cy:-Math.sin(kb.ang)*len,kb:true,armed:true};$('hint').style.opacity=0}
+addEventListener('keydown',e=>{
+  if(!kbReady())return;const k=e.key,fine=e.shiftKey;
+  if(k==='ArrowLeft'||k==='ArrowRight'||k==='ArrowUp'||k==='ArrowDown'){
+    e.preventDefault();
+    if(!kb)kb={ang:Math.atan2(hole.pin.y-ball.y,hole.pin.x-ball.x),p:isPutt()?0.3:0.6};
+    if(k==='ArrowLeft')kb.ang-=(fine?0.5:2)*Math.PI/180;
+    if(k==='ArrowRight')kb.ang+=(fine?0.5:2)*Math.PI/180;
+    if(k==='ArrowUp')kb.p=Math.min(1,kb.p+(fine?0.005:0.02));
+    if(k==='ArrowDown')kb.p=Math.max(0,kb.p-(fine?0.005:0.02));
+    kbAim();
+  }else if((k===' '||k==='Enter')&&drag&&drag.kb){
+    e.preventDefault();const d=dragInfo();drag=null;kb=null;
+    if(d&&d.p>=0.05){look=null;mapMode=false;syncMapBtn();shoot(d)}else $('hint').style.opacity=1;
+  }
+});
 function syncMapBtn(){const away=mapMode||look;$('mapBtn').setAttribute('aria-pressed',!!away);$('mapLabel').textContent=away?'Back to the ball':'See the hole'}
 
 const pts=new Map();let lockAim=false;
@@ -177,16 +201,16 @@ function sink(){state='sinking';sinkT=0;ball.vx=ball.vy=ball.vz=0;ball.z=0;ball.
 
 const NAMES={'-3':'Albatross','-2':'Eagle','-1':'Birdie','0':'Par','1':'Bogey','2':'Double bogey'};
 const LINES={
-  great:["That one went in like it had a dinner reservation. Amsterdam is 4°C and grey today, just saying.","Even the palms stopped swaying to watch. Somewhere in Rotterdam, someone is scraping ice off a windscreen."],
-  par:["Solid, steady, sunny. That's more than you can say for the weather back home.","Par in 28 degrees. Your colleagues in the office would like a word."],
-  over:["The palms were cheering for you anyway. Tomorrow's hole is waiting, and so is the beach.","A few extra swings, a few extra minutes in the sun. We'd call that a win."]
+  great:["That one went in like it had a dinner reservation. Back home it\u2019s probably grey and cold, just saying.","Even the palms stopped swaying to watch. Somewhere in Rotterdam, someone is scraping ice off a windscreen."],
+  par:["Solid, steady, sunny. That’s more than you can say for the weather back home.","Par in 28 degrees. Your colleagues in the office would like a word."],
+  over:["The palms were cheering for you anyway. Tomorrow’s hole is waiting, and so is the beach.","A few extra swings, a few extra minutes in the sun. We’d call that a win."]
 };
 function scoreName(){const d=strokes-hole.par;return strokes===1?'Hole in one':(NAMES[String(d)]||('+'+d))}
 function showEnd(){emit('holed',{num:hole.num,strokes:strokes,best_m:strokes===1||!isFinite(closest)?0:Math.round(closest*10)/10});
   const diff=strokes-hole.par;$('endKicker').textContent='Hole '+hole.num+', par '+hole.par;$('endScore').textContent=strokes;$('endName').textContent=scoreName();
   const pool=diff<0?LINES.great:diff===0?LINES.par:LINES.over;$('endLine').textContent=pool[Math.floor(Math.random()*pool.length)];
   const other=(HOLES.indexOf(hole)+1)%HOLES.length;$('nextBtn').textContent='Play hole '+HOLES[other].num;$('nextBtn').dataset.hole=other;
-  $('shareBtn').textContent='Share my score';$('endOverlay').hidden=false;$('nextBtn').focus();
+  $('shareBtn').textContent='Share score';$('endOverlay').hidden=false;$('nextBtn').focus();
 }
 document.querySelectorAll('.holepick').forEach(b=>b.onclick=()=>{$('introOverlay').hidden=true;closeMap();startHole(+b.dataset.hole)});
 $('nextBtn').onclick=()=>{$('endOverlay').hidden=true;startHole(+$('nextBtn').dataset.hole)};
@@ -200,7 +224,7 @@ $('shareBtn').onclick=async()=>{
 const MAPW=1374,MAPH=1145;
 const MARKS=window.BB_DATA.marks,CARD=window.BB_DATA.card,HCP=window.BB_DATA.hcp,TIPS=window.BB_DATA.tips;
 function genericTips(n){const h=HCP[n],lvl=h<=6?'one of the toughest holes out here':h<=12?'a fair test, right in the middle of the pack':'one of the more forgiving holes on the course';
- return["Hole "+n+", par "+CARD[n][0]+". Handicap "+h+" makes it "+lvl+".","I'm still walking this one with the greenkeepers. It'll be playable soon. For now, try holes 1 to 4, 6 or 7."]}
+ return["Hole "+n+", par "+CARD[n][0]+". Handicap "+h+" makes it "+lvl+".","I’m still walking this one with the greenkeepers. It’ll be playable soon. For now, try holes 1 to 4, 6 or 7."]}
 let dlg={lines:[],i:0,c:0,timer:null};
 function typeLine(){clearInterval(dlg.timer);const full=dlg.lines[dlg.i];dlg.c=0;$('dlgMore').hidden=true;if(window.Steffen)Steffen.say(full);
  if(reduceMotion){$('dlgText').textContent=full;lineDone();return}
@@ -213,7 +237,10 @@ let mv={s:1,x:0,y:0,min:1},mp=new Map(),mPan=null,mMoved=0,selNum=null;
 const markBtns={};
 Object.keys(MARKS).forEach(n=>{n=+n;const live=HOLES.some(h=>h.num===n);const b=document.createElement('button');
   b.className='hmark '+(live?'live':'soon');b.textContent=n;b.setAttribute('aria-label','Hole '+n+(live?'':', coming soon'));
-  b.addEventListener('click',()=>{if(mMoved>8)return;selectHole(n)});marksEl.appendChild(b);markBtns[n]=b});
+  b.addEventListener('click',()=>{if(mMoved>8)return;selectHole(n)});
+  b.addEventListener('focus',()=>{const w=mapEl.clientWidth,h=mapEl.clientHeight,x=MARKS[n][0]*mv.s+mv.x,y=MARKS[n][1]*mv.s+mv.y;
+    if(x<40||y<90||x>w-40||y>h-40){mv.x+=w/2-x;mv.y+=h/2-y;mapApply()}});
+  marksEl.appendChild(b);markBtns[n]=b});
 function mapFit(){const w=mapEl.clientWidth,h=mapEl.clientHeight;mv.min=Math.min(w/MAPW,h/MAPH);
   const s=Math.max(mv.min,Math.min(w/MAPW*1.6,h/MAPH));mv.s=s;mv.x=(w-MAPW*s)/2;mv.y=(h-MAPH*s)/2;mapApply()}
 function mapClamp(){const w=mapEl.clientWidth,h=mapEl.clientHeight,mw=MAPW*mv.s,mh=MAPH*mv.s;
@@ -306,7 +333,7 @@ function draw(dt){
     ctx.fillStyle=col==='#FFFFFF'?'#F4ECDD':col;ctx.fillText(label,b[0],b[1]-R-22);
     ctx.font='500 12px Outfit, system-ui, sans-serif';ctx.fillStyle='#FFFFFF';{const cm=Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m;ctx.fillText(putt?'Putt, about '+Math.max(1,Math.round(cm))+' m':LOFTS[loft].n+' shot, ~'+Math.round(cm/5)*5+' m, no wind',b[0],b[1]+R+16)}
   }
-  if(drag&&drag.armed&&!drag.demo&&state==='ready'){
+  if(drag&&drag.armed&&!drag.demo&&!drag.kb&&state==='ready'){
     const r=cv.getBoundingClientRect(),sx=drag.sx-r.left,sy=drag.sy-r.top,inside=d&&d.cancel,k=7;
     ctx.save();ctx.fillStyle=inside?'rgba(224,68,58,.92)':'rgba(30,42,99,.6)';ctx.beginPath();ctx.arc(sx,sy,inside?24:20,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx-k,sy-k);ctx.lineTo(sx+k,sy+k);ctx.moveTo(sx+k,sy-k);ctx.lineTo(sx-k,sy+k);ctx.stroke();

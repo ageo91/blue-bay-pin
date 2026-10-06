@@ -11,7 +11,7 @@ function markSeen(){try{localStorage.setItem(KEY,'1')}catch(e){}}
 // layout: bottom = Steffen standing over the speech box. top = compact box at the top.
 // spot: CSS selector to highlight. wait: game event that moves the tutorial on.
 const STEPS=[
-  {mode:'talk',layout:'bottom',text:"Welcome to Blue Bay! I'm Steffen, the golf pro here. Let me show you how it works."},
+  {mode:'talk',layout:'bottom',text:"Welcome to Blue Bay! I’m Steffen, the golf pro here. Let me show you how it works."},
   {mode:'talk',layout:'top',demo:true,text:"To hit the ball, put one finger anywhere on the screen and pull back. The further you pull, the harder you hit. Changed your mind? Slide back to the ✕ where you started and let go."},
   {mode:'do',layout:'top',wait:'stopped',text:"Your turn! Pull back anywhere and let go."},
   {mode:'talk',layout:'bottom',text:"Nice! The dotted arc shows your shot in calm air. Use it to aim around trouble.",penaltyText:"Ouch, that one found trouble. No worries: the dotted arc shows your shot in calm air, so use it to aim around hazards."},
@@ -21,7 +21,7 @@ const STEPS=[
   {mode:'talk',layout:'top',spot:'.loft',text:"Pick your shot height here. High shots stop quickly on the green, low shots run out further."},
   {mode:'talk',layout:'top',spot:'#mapBtn',text:"Tap 'See the hole' for the full view, with the distance to the pin."},
   {mode:'talk',layout:'top',spot:'#courseBtn',text:"And 'Course' takes you back to the map to pick another hole."},
-  {mode:'talk',layout:'bottom',text:"That's it! Find the green, sink your putt, and I'll see you at the 19th hole."}
+  {mode:'talk',layout:'bottom',text:"That’s it! Find the green, sink your putt, and I’ll see you at the 19th hole."}
 ];
 
 let lastPenalty=false,i=-1,active=false,typing=null,demoRaf=null,waitFor=null;

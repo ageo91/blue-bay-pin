@@ -11,7 +11,7 @@
 </head>
 <body>
 <div id="game">
-  <canvas id="c" aria-label="Golf hole seen from above. Pull back anywhere to shoot, use two fingers or scroll to look around."></canvas>
+  <canvas id="c" tabindex="0" aria-label="Golf hole seen from above. Pull back anywhere to shoot, use two fingers or scroll to look around. With a keyboard: arrow keys aim and set power, Space shoots, Escape cancels."></canvas>
   <div class="hud"><div class="pill"><b id="strokes">Shot 1</b><span id="info"></span></div></div>
   <div class="pill windpill" aria-live="polite"><svg viewBox="0 0 24 24" id="windArrow" aria-hidden="true"><path d="M12 2 L19 12 L14 12 L14 22 L10 22 L10 12 L5 12 Z" fill="#E8892B"/></svg><span><b id="windSpeed">0</b>km/h wind</span></div>
   <button class="mapbtn" id="mapBtn" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg><span id="mapLabel">See the hole</span></button>
@@ -21,8 +21,8 @@
     <button data-loft="0" aria-pressed="false"><svg viewBox="0 0 26 16" aria-hidden="true"><path d="M2 15 Q13 8 24 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="2.5 2.5"/></svg>Low</button>
   </div>
   <button class="mapbtn coursebtn" id="courseBtn"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 21V4"/><path d="M5 4h11l-2.5 3.5L16 11H5"/></svg><span>Course</span></button>
-  <div class="hint" id="hint">Pull back anywhere to shoot. Use two fingers to look around.</div>
-  <div class="toast" id="toast"></div>
+  <div class="hint" id="hint">Pull back anywhere to shoot. Use two fingers to look around.<span class="kbhint"> Or use the arrow keys and Space.</span></div>
+  <div class="toast" id="toast" role="status"></div>
 
   <div id="courseMap" aria-label="Blue Bay course map. Drag to move, pinch or scroll to zoom, tap a hole number.">
     <div id="mapLayer"><img alt="" src="assets/course-map.jpg"></div>
@@ -46,13 +46,13 @@
   </div>
 
   <div class="overlay" id="introOverlay">
-    <div class="card intro">
+    <div class="card intro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
       <p class="kicker">Blue Bay, Christmas challenge</p>
-      <h1>Closest to the pin</h1>
+      <h1 id="introTitle">Closest to the pin</h1>
       <p>Pull back anywhere on the screen with one finger and let go. Use two fingers to move around the hole.</p>
       <button class="btn primary" id="openMapBtn" style="margin:0 0 8px">Choose a hole on the course map</button>
       <button class="btn ghost" id="howBtn" style="margin:0 0 8px">How to play, with Steffen</button>
-      <button class="btn ghost" id="lbMenuBtn" data-lb hidden style="margin:0 0 14px">Today's leaderboard</button>
+      <button class="btn ghost" id="lbMenuBtn" data-lb hidden style="margin:0 0 14px">Today’s leaderboard</button>
       <p style="font-size:13px;color:var(--muted);margin:0 0 4px">Or jump straight in:</p>
       <button class="holepick" data-hole="0"><span><b>Hole 1</b>The opener along the beach</span><span class="par">Par 4</span></button>
       <button class="holepick" data-hole="1"><span><b>Hole 2</b>A long par 5 between the trees</span><span class="par">Par 5</span></button>
@@ -64,37 +64,46 @@
   </div>
 
   <div class="overlay" id="endOverlay" hidden>
-    <div class="card">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="endKicker endName">
       <p class="kicker" id="endKicker"></p>
       <p class="score" id="endScore">4</p>
       <p class="name" id="endName">Par</p>
       <p class="line" id="endLine"></p>
-      <div class="lb" id="lbBox" hidden>
-        <form id="lbJoin" class="lbjoin" hidden>
-          <p class="lbhead">Put your score on today's leaderboard</p>
-          <div class="lbrow"><input id="lbName" maxlength="16" placeholder="Pick a name" autocomplete="nickname" aria-label="Your leaderboard name"><button class="btn primary" type="submit">Post</button></div>
-          <p class="lbsmall">No account needed. Only your name and score are shown.</p>
-        </form>
-        <p class="lbresult" id="lbResult" aria-live="polite" hidden></p>
-        <p class="lberr" id="lbErr" role="alert" hidden></p>
-        <button class="btn ghost" id="lbOpenBtn" type="button">Today's leaderboard</button>
-      </div>
       <button class="btn primary" id="nextBtn">Play hole 7</button>
-      <button class="btn ghost" id="endMapBtn">Back to the course map</button>
-      <button class="btn ghost" id="shareBtn">Share my score</button>
-      <a class="btn ghost" href="https://bluebay-curacao.com/holidays/" target="_blank" rel="noopener">See holiday events</a>
-      <button class="btn ghost" id="againBtn">Play again</button>
-      <p class="note">Prototype. In the live version the AI writes this line from your shot and your home city's weather.</p>
+      <div class="endacts">
+        <button class="btn ghost" id="againBtn">Play again</button>
+        <button class="btn ghost" id="endMapBtn">Course map</button>
+      </div>
+      <div class="lb" id="lbBox" hidden>
+        <form id="lbJoin" class="lbjoin" novalidate hidden>
+          <p class="lbhead">Put your score on today’s leaderboard</p>
+          <label class="lblabel" for="lbName">Your name on the board</label>
+          <div class="lbrow"><input id="lbName" name="nickname" maxlength="16" placeholder="Sandy_G" autocomplete="nickname" autocapitalize="words" spellcheck="false" aria-describedby="lbHelp"><button class="btn ghost" type="submit">Post</button></div>
+          <p class="lbsmall" id="lbHelp">3 to 16 letters, numbers, spaces or _. No account needed. Only your name and score are shown.</p>
+        </form>
+        <p class="lbresult" id="lbResult" role="status" hidden></p>
+        <p class="lberr" id="lbErr" hidden></p>
+      </div>
+      <div class="endacts">
+        <button class="btn ghost" id="lbOpenBtn" type="button" data-lb hidden>Leaderboard</button>
+        <button class="btn ghost" id="shareBtn">Share score</button>
+      </div>
+      <a class="endlink" href="https://bluebay-curacao.com/holidays/" target="_blank" rel="noopener">See Blue Bay holiday events<span class="sr"> (opens in a new tab)</span></a>
     </div>
   </div>
 
   <div class="overlay" id="lbOverlay" hidden>
-    <div class="card lbcard" role="dialog" aria-labelledby="lbTitle">
-      <p class="kicker">Today's leaderboard</p>
+    <div class="card lbcard" role="dialog" aria-modal="true" aria-labelledby="lbKicker lbTitle">
+      <p class="kicker" id="lbKicker">Today’s leaderboard</p>
       <h2 id="lbTitle">Hole 1</h2>
-      <div class="lbtabs" id="lbTabs" role="tablist" aria-label="Hole"></div>
-      <div class="lbcols" aria-hidden="true"><span>#</span><span>Player</span><span>Strokes</span><span>Closest</span></div>
-      <ol class="lblist" id="lbList"></ol>
+      <div class="lbtabs" id="lbTabs" role="group" aria-label="Choose a hole"></div>
+      <div class="lbscroll">
+        <table class="lbtable">
+          <caption id="lbCaption">Today’s leaderboard</caption>
+          <thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">Strokes</th><th scope="col">Closest</th></tr></thead>
+          <tbody id="lbList"></tbody>
+        </table>
+      </div>
       <p class="note">Fewest strokes wins. Ties go to the shot that stopped closest to the pin. Everyone plays the same wind, and the board resets at midnight Curaçao time.</p>
       <button class="btn ghost" id="lbClose">Close</button>
     </div>
@@ -129,5 +138,6 @@
 <script src="js/game.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/leaderboard.js"></script>
+<script src="js/overlays.js"></script>
 </body>
 </html>

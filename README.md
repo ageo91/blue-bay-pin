@@ -19,6 +19,7 @@ js/game.js            Game engine: physics, camera, controls, course map, hole c
 js/tutorial.js        Steffen's tutorial (first visit, or "How to play" in the menu)
 js/steffen.js         Animated Steffen: blinking, talking mouth, a pose per line
 js/leaderboard.js     Today's leaderboard: name form, auto-post, per-hole board
+js/overlays.js        Modal cards: keeps keyboard focus inside the open card and returns it on close
 js/config.js          Leaderboard API address (empty = no leaderboard)
 worker/               Leaderboard API: Cloudflare Worker + D1 database
 assets/holes/         Hole artwork, one file per hole (hole-N.jpg)
@@ -42,6 +43,15 @@ tools/bundle.py       Packs everything into one HTML file in dist/
    Check its wind exposure in `window.BB_DATA.exposure` (1 = on the sea, 0 = sheltered).
 5. Add `<script src="assets/masks/hole-N.js"></script>` to `index.html`, plus a quick-pick
    button in the menu if you want one.
+
+## Controls and accessibility
+
+Touch: pull back anywhere to shoot, slide back to the ✕ to cancel, two fingers to look around.
+Keyboard: arrow keys aim (Left/Right) and set power (Up/Down), Shift for fine steps, Space or Enter
+shoots, Escape cancels. Interface rules (contrast, focus, layout, copy) follow the skills in
+`.claude/skills/` (better-interface and friends, from jakubkrehel/skills). Colour roles are tokens at
+the top of `css/style.css`: use `--accent-text` for orange text on cards (plain `--orange` is too
+light for text there) and `--focus` for focus rings.
 
 ## Wind and aiming
 
