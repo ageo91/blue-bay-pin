@@ -174,7 +174,7 @@ function step(dt){
     const dh=Math.hypot(hole.pin.x-ball.x,hole.pin.y-ball.y);
     if(ball.air){
       if(!trail.length||Math.hypot(ball.x-trail[trail.length-1].x,ball.y-trail[trail.length-1].y)>14)trail.push({x:ball.x,y:ball.y,z:ball.z});
-      ball.vz-=G*dt;ball.vx+=wind.ax*dt;ball.vy+=wind.ay*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.z+=ball.vz*dt;
+      ball.vz-=G*dt;ball.vx+=wind.ax*dt;ball.vy+=wind.ay*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.z+=ball.vz*dt;ball.rx=(ball.rx||0)+ball.vx*dt*0.5;ball.ry=(ball.ry||0)+ball.vy*dt*0.5;
       if(ball.z<=0){
         ball.z=0;const lie=lieAt(ball.x,ball.y);
         if(hazard(lie)){penalty(lie);return}
@@ -200,7 +200,7 @@ function step(dt){
     if(sp<=f||sp<2){ball.vx=ball.vy=0;state='ready';aimMark=null;updateHud();emit('stopped',{lie:lie});
       if(lie===S.GREEN)toast(Math.round(dh*hole.m*10)/10+' m from the pin');
       return}
-    ball.vx-=ball.vx/sp*f;ball.vy-=ball.vy/sp*f;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+    ball.vx-=ball.vx/sp*f;ball.vy-=ball.vy/sp*f;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.rx=(ball.rx||0)+ball.vx*dt;ball.ry=(ball.ry||0)+ball.vy*dt;
   }else if(state==='sinking'){
     sinkT+=dt;ball.x+=(hole.pin.x-ball.x)*Math.min(dt*10,1);ball.y+=(hole.pin.y-ball.y)*Math.min(dt*10,1);ball.scale=Math.max(0,1-sinkT*2.5);
     if(sinkT>0.6){state='done';showEnd()}
@@ -285,6 +285,29 @@ addEventListener('resize',()=>{if(mapEl.classList.contains('open'))mapApply()});
 function w2s(x,y){return[(x-cam.x)*scale+W/2,(y-cam.y)*scale+H/2]}
 // Centre x for a label of width w, kept 8px inside the canvas so labels near the edge stay readable
 function inside(x,w){return Math.min(Math.max(x,w/2+8),W-w/2-8)}
+// Golf ball: hexagonal dimple pattern (rolls with the ball), soft light from the top left, darker rim and a
+// small glint. Dimples only from 6px radius up; smaller than that they would read as noise.
+const dimples=(()=>{const c=document.createElement('canvas');c.width=14;c.height=24;const x=c.getContext('2d');   // hex grid: 14px between every pair of neighbours
+  [[0,0],[14,0],[7,12],[0,24],[14,24]].forEach(([px,py])=>{
+    const g=x.createRadialGradient(px+.8,py+.8,0,px,py,5);g.addColorStop(0,'rgba(70,80,95,.22)');g.addColorStop(.7,'rgba(70,80,95,.10)');g.addColorStop(1,'rgba(70,80,95,0)');
+    x.fillStyle=g;x.beginPath();x.arc(px,py,5,0,Math.PI*2);x.fill();
+    x.fillStyle='rgba(255,255,255,.5)';x.beginPath();x.arc(px-1.5,py-1.5,1.2,0,Math.PI*2);x.fill()});
+  return c})();
+let dimplePat=null;
+function drawBall(x,y,r){
+  if(r<=0)return;ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
+  ctx.fillStyle='#F7F7F4';ctx.fillRect(x-r,y-r,r*2,r*2);
+  if(r>=6){if(!dimplePat)dimplePat=ctx.createPattern(dimples,'repeat');
+    const k=r/50;dimplePat.setTransform(new DOMMatrix().translate(x+(ball.rx||0)*scale,y+(ball.ry||0)*scale).scale(k));
+    ctx.fillStyle=dimplePat;ctx.fillRect(x-r,y-r,r*2,r*2);
+    const f=ctx.createRadialGradient(x,y,r*.55,x,y,r);f.addColorStop(0,'rgba(247,247,244,0)');f.addColorStop(1,'rgba(247,247,244,.75)');ctx.fillStyle=f;ctx.fillRect(x-r,y-r,r*2,r*2)}   // dimples foreshorten toward the rim
+  let g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.1,x-r*.2,y-r*.25,r*1.25);
+  g.addColorStop(0,'rgba(255,255,255,.7)');g.addColorStop(.45,'rgba(255,255,255,0)');g.addColorStop(.78,'rgba(140,150,168,.3)');g.addColorStop(1,'rgba(60,70,95,.65)');
+  ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
+  g=ctx.createRadialGradient(x-r*.38,y-r*.42,0,x-r*.38,y-r*.42,r*.32);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore();
+  ctx.strokeStyle='rgba(30,42,99,.35)';ctx.lineWidth=Math.max(1,r*.06);ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+}
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 function draw(dt){
   if(!ball)return;
@@ -370,8 +393,7 @@ function draw(dt){
     const zs=ball.z/hole.k;
     const r=BALL_R*scale*(1+zs/320)*ball.scale;
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(b[0]+zs*scale*.3,b[1]+zs*scale*.45+2,BALL_R*scale*ball.scale,BALL_R*scale*.7*ball.scale,0,0,Math.PI*2);ctx.fill();
-    const by=b[1]-zs*scale;ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(b[0],by,Math.max(r,0),0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='rgba(30,42,99,.5)';ctx.lineWidth=1.2;ctx.stroke();
+    drawBall(b[0],b[1]-zs*scale,Math.max(r,0));
   }
   if(h[0]<0||h[0]>W||h[1]<0||h[1]>H){
     const ang=Math.atan2(h[1]-H/2,h[0]-W/2),m=34;
