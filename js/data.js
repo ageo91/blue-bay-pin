@@ -1,5 +1,5 @@
 // Blue Bay Pin: course and hole data.
-// To add a hole: export its artwork to assets/holes/hole-N.jpg, generate assets/masks/hole-N.js
+// To add a hole: export its artwork to assets/holes/hole-N.jpg (and hole-N.webp, see README), generate assets/masks/hole-N.js
 // with tools/build_mask.py, then add an entry below and a TIPS entry for Steffen.
 window.BB_DATA={};
 
@@ -7,17 +7,17 @@ window.BB_DATA={};
 // m: metres per px. k: physics scale so a full shot carries ~175 m. drop: penalty drop zone or null.
 window.BB_DATA.holes=[
   {num:1,par:4,w:1670,h:942,mw:417,mh:235,tee:{x:140,y:786},pin:{x:1452,y:258},m:0.265,k:1.19,bg:'#018EBD',drop:null,
-   src:"assets/holes/hole-1.jpg"},
+   src:"assets/holes/hole-1.webp"},
   {num:2,par:5,w:1568,h:1003,mw:392,mh:250,tee:{x:140,y:838},pin:{x:1381,y:224},m:0.337,k:0.94,bg:'#239463',drop:null,
-   src:"assets/holes/hole-2.jpg"},
+   src:"assets/holes/hole-2.webp"},
   {num:3,par:3,w:1535,h:1024,mw:383,mh:256,tee:{x:225,y:795},pin:{x:1191,y:366},m:0.126,k:2.51,bg:'#249569',drop:null,
-   src:"assets/holes/hole-3.jpg"},
+   src:"assets/holes/hole-3.webp"},
   {num:4,par:4,w:1672,h:941,mw:418,mh:235,tee:{x:125,y:815},pin:{x:1473,y:258},m:0.247,k:1.28,bg:'#1E956B',drop:null,
-   src:"assets/holes/hole-4.jpg"},
+   src:"assets/holes/hole-4.webp"},
   {num:6,par:3,w:1470,h:1070,mw:367,mh:267,tee:{x:168,y:752},pin:{x:1217,y:303},m:0.139,k:2.25,bg:'#048AB4',drop:{x:1300,y:215},
-   src:"assets/holes/hole-6.jpg"},
+   src:"assets/holes/hole-6.webp"},
   {num:7,par:4,w:1568,h:1003,mw:392,mh:251,tee:{x:158.5,y:855},pin:{x:1386,y:226},m:0.24,k:1.32,bg:'#187F4C',drop:null,
-   src:"assets/holes/hole-7.jpg"}
+   src:"assets/holes/hole-7.webp"}
 ];
 
 // Course map: marker position per hole (px in assets/course-map.jpg), scorecard [par, yards], handicap, Steffen tips.

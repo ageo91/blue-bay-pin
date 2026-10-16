@@ -3,7 +3,8 @@
 // Pixel boxes below are in steffen.png (320x598). If the artwork changes, update them.
 // API: Steffen.say(line) when a new line starts, Steffen.speak(textSoFar) while it types out.
 (function(){
-const SRC='assets/steffen.png',IW=320,IH=598,PAD={l:14,t:10,r:10};
+// steffen.webp is a lossless copy of steffen.png, so the pixel boxes below still match.
+const SRC='assets/steffen.webp',IW=320,IH=598,PAD={l:14,t:10,r:10};
 const EYES=[{x0:144,x1:163,y0:73,y1:88},{x0:182,x1:204,y0:74,y1:90}];
 const MOUTH={x0:155,x1:190,y0:111,y1:120};
 const HEAD_CUT=146,HEAD_KEEP=138,HEAD_PIVOT={x:175,y:140};   // head layer rows 0..145, body keeps rows from 138
@@ -95,9 +96,13 @@ function tick(now){
     if(now<speakUntil){if(now-mouthAt>90){mouthAt=now;
       mouth=/[aeiouy]/i.test(lastCh)?(mouth===2?1:2):/[mbp]/i.test(lastCh)?1:/[\s.,!?]/.test(lastCh)?0:(mouth===1?2:1)}}
     else if(mouth!==0&&now-mouthAt>90)mouth=0;
-    document.querySelectorAll('canvas[data-steffen]').forEach(cv=>{if(cv.getClientRects().length)draw(cv,now)});
   }
-  requestAnimationFrame(tick);
+  // Redraw only when the picture would change; while Steffen is off screen, check back a few times a second.
+  const shown=[...document.querySelectorAll('canvas[data-steffen]')].filter(cv=>cv.getClientRects().length);
+  if(ready){const key=now<speakUntil||hopT>=0?now:[blink,mouth,reduceMotion?0:Math.round((Math.sin(now/900)+1)/2),
+      Math.round(cur.hand*4),Math.round(cur.head*4),Math.round(cur.lean*8)].join();
+    shown.forEach(cv=>{if(cv._k!==key||cv.width!==IW+PAD.l+PAD.r){cv._k=key;draw(cv,now)}})}
+  if(shown.length)requestAnimationFrame(tick);else setTimeout(()=>requestAnimationFrame(tick),300);
 }
 requestAnimationFrame(tick);
 window.Steffen={say:say,speak:speak};

@@ -8,7 +8,7 @@ so the result can be published as a single page or sent around as one file.
 import base64, pathlib, re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 
 
 def data_uri(rel):
@@ -17,7 +17,7 @@ def data_uri(rel):
 
 
 def inline_assets(text):
-    return re.sub(r"assets/[\w\-/]+\.(?:jpg|jpeg|png)",
+    return re.sub(r"assets/[\w\-/]+\.(?:jpg|jpeg|png|webp)",
                   lambda m: data_uri(m.group(0)) if (ROOT / m.group(0)).is_file() else m.group(0), text)
 
 

@@ -34,6 +34,8 @@ tools/bundle.py       Packs everything into one HTML file in dist/
 ## Add a hole
 
 1. Save the artwork as `assets/holes/hole-N.jpg` (remove any ball drawn on the tee).
+   Then make the web copy the game loads: `cwebp -q 82 -m 6 -sharp_yuv assets/holes/hole-N.jpg -o assets/holes/hole-N.webp`
+   (JPG/PNG files are the sources; the game ships the `.webp` copies. Steffen's is lossless: `cwebp -lossless`.)
 2. Run `python3 tools/build_mask.py assets/holes/hole-N.jpg N --green X,Y --tee X,Y --pin X,Y`
    and check `tools/preview-hole-N.png`.
 3. Add the hole to `window.BB_DATA.holes` in `js/data.js`: size, tee, pin, metres per pixel
@@ -43,6 +45,13 @@ tools/bundle.py       Packs everything into one HTML file in dist/
    Check its wind exposure in `window.BB_DATA.exposure` (1 = on the sea, 0 = sheltered).
 5. Add `<script src="assets/masks/hole-N.js"></script>` to `index.html`, plus a quick-pick
    button in the menu if you want one.
+
+## Mobile performance
+
+Only the hole being played downloads its artwork (the next hole is fetched quietly after). The canvas
+redraws only while something moves (ball, camera, aim, the 4 s "your turn" pulse) and stops at rest;
+Steffen redraws only when his picture changes. Page height uses `100dvh` so the iPhone address bar
+never covers the bottom controls.
 
 ## Controls and accessibility
 

@@ -9,7 +9,13 @@ const G0=600, ANGLE=0.55, SPEED0=610, CARRY0=SPEED0*SPEED0*Math.sin(2*ANGLE)/G0,
 const WIND_FX=1.5, CUP_SPEED=55; // wind push multiplier; a putt drops only below this speed (x sqrt k), about 2.5 m of roll past the cup
 function decode(s){const m=new Uint8Array(s.length);for(let i=0;i<s.length;i++)m[i]=s.charCodeAt(i)-48;return m}
 const HOLES=window.BB_DATA.holes.map(h=>Object.assign(h,{mask:decode(window.BB_MASKS[h.num])}));
-HOLES.forEach(h=>{h.img=new Image();h.img.src=h.src});
+// Hole artwork loads on demand (one hole at a time), with the next hole fetched once this one is in.
+function loadImg(h){if(!h.img){h.img=new Image();h.img.decoding='async';h.img.onload=()=>{wake();
+  const nx=HOLES[(HOLES.indexOf(h)+1)%HOLES.length];if(!nx.img)setTimeout(()=>loadImg(nx),1500)};h.img.src=h.src}return h.img}
+// The canvas only redraws while something changes: the ball, the camera, an aim, a pan, or the 4 s "your turn" pulse.
+// Input and state changes call wake(); when nothing is moving the loop stops, which saves battery on phones.
+let running=false,wakeUntil=0,pulseUntil=0,camMoved=true,lastState='',prev=0;
+function wake(ms){wakeUntil=Math.max(wakeUntil,performance.now()+(ms||250));if(!running){running=true;prev=performance.now();requestAnimationFrame(loop)}}
 let hole=HOLES[0];
 function lieAt(x,y){const mx=Math.floor(x/4),my=Math.floor(y/4);if(mx<0||my<0||mx>=hole.mw||my>=hole.mh)return S.WATER;return hole.mask[my*hole.mw+mx]}
 function emit(name,detail){window.dispatchEvent(new CustomEvent('bb:'+name,{detail:detail}))}
@@ -45,7 +51,7 @@ function windTip(num){const r=windRead(num);if(!r)return null;
   const t=tips.join(', and ');
   return feel+', '+r.kmh+' km/h, '+(windShort(r).replace(/^Wind \d+ km\/h, /,'').replace(/\.$/,''))+'.'+where+' The dotted arc ignores the wind, so '+t+'.'}
 function startHole(i){
-  hole=HOLES[i];document.body.style.background=hole.bg;
+  hole=HOLES[i];loadImg(hole);wake();document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
   strokes=0;closest=Infinity;kb=null;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
   wind=dailyWind(hole.num);trail=[];aimMark=null;
@@ -70,7 +76,7 @@ function resize(){
   flakes=[];const n=(reduceMotion||!SNOW)?0:Math.round(W*H/9000);
   for(let i=0;i<n;i++)flakes.push({x:Math.random()*W,y:Math.random()*H,r:0.8+Math.random()*1.8,s:12+Math.random()*28,d:Math.random()*6});
 }
-addEventListener('resize',resize);
+addEventListener('resize',()=>{resize();wake()});
 
 function isPutt(){return lieAt(ball.x,ball.y)===S.GREEN}
 function eff(p){return Math.pow(p,1.35)}
@@ -99,7 +105,7 @@ function kbReady(){
 }
 function kbAim(){const len=CANCEL_R+kb.p*Math.min(W,H)*0.42;drag={sx:0,sy:0,cx:-Math.cos(kb.ang)*len,cy:-Math.sin(kb.ang)*len,kb:true,armed:true};$('hint').style.opacity=0}
 addEventListener('keydown',e=>{
-  if(!kbReady())return;const k=e.key,fine=e.shiftKey;
+  if(!kbReady())return;wake();const k=e.key,fine=e.shiftKey;
   if(k==='ArrowLeft'||k==='ArrowRight'||k==='ArrowUp'||k==='ArrowDown'){
     e.preventDefault();
     if(!kb)kb={ang:Math.atan2(hole.pin.y-ball.y,hole.pin.x-ball.x),p:isPutt()?0.3:0.6};
@@ -113,7 +119,7 @@ addEventListener('keydown',e=>{
     if(d&&d.p>=0.05){look=null;mapMode=false;syncMapBtn();shoot(d)}else $('hint').style.opacity=1;
   }
 });
-function syncMapBtn(){const away=mapMode||look;$('mapBtn').setAttribute('aria-pressed',!!away);$('mapLabel').textContent=away?'Back to the ball':'See the hole'}
+function syncMapBtn(){wake();const away=mapMode||look;$('mapBtn').setAttribute('aria-pressed',!!away);$('mapLabel').textContent=away?'Back to the ball':'See the hole'}
 
 const pts=new Map();let lockAim=false;
 function mid(){let x=0,y=0;pts.forEach(p=>{x+=p.x;y+=p.y});return{x:x/pts.size,y:y/pts.size}}
@@ -141,7 +147,7 @@ function up(e){
 cv.addEventListener('contextmenu',e=>{e.preventDefault();cancelAim()});
 addEventListener('keydown',e=>{if(e.key==='Escape')cancelAim()});
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
-cv.addEventListener('wheel',e=>{e.preventDefault();if(state==='intro'||state==='done')return;if(!look)look={x:cam.x,y:cam.y};look.x+=e.deltaX/scale;look.y+=e.deltaY/scale;syncMapBtn();emit('look')},{passive:false});
+cv.addEventListener('wheel',e=>{e.preventDefault();wake();if(state==='intro'||state==='done')return;if(!look)look={x:cam.x,y:cam.y};look.x+=e.deltaX/scale;look.y+=e.deltaY/scale;syncMapBtn();emit('look')},{passive:false});
 
 // closest: nearest the ball came to rest before a shot (tee excluded), the leaderboard tiebreak
 function shoot(d){
@@ -267,11 +273,11 @@ function selectHole(n){selNum=n;for(const k in markBtns)markBtns[k].classList.to
   $('sheetPlay').disabled=!live;$('sheetPlay').textContent=live?'Play':'Soon';$('sheet').hidden=false;typeLine()}
 function openMap(){state='intro';$('introOverlay').hidden=true;$('endOverlay').hidden=true;$('sheet').hidden=true;mapEl.classList.add('open');mapFit();
   for(const k in markBtns)markBtns[k].classList.remove('sel')}
-function closeMap(){mapEl.classList.remove('open');clearInterval(dlg.timer);dlg.timer=null}
+function closeMap(){mapEl.classList.remove('open');wake();clearInterval(dlg.timer);dlg.timer=null}
 $('sheetClose').onclick=()=>{$('sheet').hidden=true;clearInterval(dlg.timer);dlg.timer=null;for(const k in markBtns)markBtns[k].classList.remove('sel')};
 $('sheetPlay').onclick=()=>{const i=HOLES.findIndex(h=>h.num===selNum);if(i<0)return;closeMap();startHole(i)};
 $('openMapBtn').onclick=openMap;$('endMapBtn').onclick=openMap;$('courseBtn').onclick=openMap;
-document.querySelectorAll('.loft button').forEach(b=>b.onclick=()=>{loft=+b.dataset.loft;document.querySelectorAll('.loft button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+document.querySelectorAll('.loft button').forEach(b=>b.onclick=()=>{loft=+b.dataset.loft;wake();document.querySelectorAll('.loft button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
 // Menu from the map: keep the course map behind the menu instead of jumping to a hole.
 $('mapMenuBtn').onclick=()=>{$('sheet').hidden=true;clearInterval(dlg.timer);dlg.timer=null;for(const k in markBtns)markBtns[k].classList.remove('sel');$('introOverlay').hidden=false};
 addEventListener('resize',()=>{if(mapEl.classList.contains('open'))mapApply()});
@@ -291,6 +297,7 @@ function draw(dt){
     const need=Math.min((W*0.82)/Math.max(x1-x0,1),((H-190)*0.85)/Math.max(y1-y0,1));
     tS=Math.max(Math.min(baseScale,need),fitScale);tx=(x0+x1)/2;ty=(y0+y1)/2;
   }
+  const s0=scale,cx0=cam.x,cy0=cam.y;
   scale+=(tS-scale)*(reduceMotion?1:Math.min(dt*5,1));
   const halfW=W/2/scale,halfH=H/2/scale;
   if(look){look.x=Math.min(Math.max(look.x,halfW),hole.w-halfW);look.y=Math.min(Math.max(look.y,halfH),hole.h-halfH);if(hole.w<=W/scale)look.x=hole.w/2;if(hole.h<=H/scale)look.y=hole.h/2}
@@ -298,10 +305,11 @@ function draw(dt){
   tx=hole.w<=W/scale?hole.w/2:Math.min(Math.max(tx,halfW-ox),hole.w-halfW+ox);
   ty=hole.h<=H/scale?hole.h/2:Math.min(Math.max(ty,halfH-oy),hole.h-halfH+oy);
   const lerp=(reduceMotion||pan||look)?1:Math.min(dt*4,1);cam.x+=(tx-cam.x)*lerp;cam.y+=(ty-cam.y)*lerp;
+  camMoved=Math.abs(scale-s0)>scale*1e-4||Math.abs(cam.x-cx0)*scale>0.1||Math.abs(cam.y-cy0)*scale>0.1;
 
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=hole.bg;ctx.fillRect(0,0,W,H);
   ctx.imageSmoothingEnabled=false;
-  if(hole.img.complete){const o=w2s(0,0);ctx.drawImage(hole.img,o[0],o[1],hole.w*scale,hole.h*scale)}
+  if(hole.img&&hole.img.complete){const o=w2s(0,0);ctx.drawImage(hole.img,o[0],o[1],hole.w*scale,hole.h*scale)}
   const h=w2s(hole.pin.x,hole.pin.y);
   ctx.fillStyle='#10301c';ctx.beginPath();ctx.ellipse(h[0],h[1]+2*scale,HOLE_R*scale,HOLE_R*scale*.7,0,0,Math.PI*2);ctx.fill();
 
@@ -347,7 +355,7 @@ function draw(dt){
       ctx.fillStyle='rgba(30,42,99,.92)';const lx=inside(sx,tw);roundRect(lx-tw/2,sy-34-26*TS,tw,26*TS,13*TS);ctx.fill();ctx.fillStyle='#F4ECDD';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,lx,sy-34-13*TS)}
     ctx.restore();
   }
-  if(state==='ready'&&!(d&&d.p>0)){const pr=reduceMotion?0.5:(Math.sin(performance.now()/350)+1)/2;ctx.strokeStyle='rgba(232,137,43,'+(0.45+pr*0.45)+')';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(b[0],b[1],Math.max(BALL_R*scale*3,26)-6+pr*4,0,Math.PI*2);ctx.stroke()}
+  if(state==='ready'&&!(d&&d.p>0)){const pr=(reduceMotion||performance.now()>pulseUntil)?0.5:(Math.sin(performance.now()/350)+1)/2;ctx.strokeStyle='rgba(232,137,43,'+(0.45+pr*0.45)+')';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(b[0],b[1],Math.max(BALL_R*scale*3,26)-6+pr*4,0,Math.PI*2);ctx.stroke()}
   if(state==='moving'||state==='sinking'){
     if(aimMark){const a=w2s(aimMark.x,aimMark.y);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);ctx.stroke();ctx.restore()}
     ctx.fillStyle='rgba(255,255,255,.55)';for(const t of trail){const s=w2s(t.x,t.y);ctx.beginPath();ctx.arc(s[0],s[1]-t.z/hole.k*scale,2,0,Math.PI*2);ctx.fill()}
@@ -374,13 +382,21 @@ window.BB={
   get state(){return state},get hole(){return hole},
   ballScreen(){const r=cv.getBoundingClientRect(),s=w2s(ball.x,ball.y);return{x:s[0]+r.left,y:s[1]+r.top}},
   pinScreen(){const r=cv.getBoundingClientRect(),s=w2s(hole.pin.x,hole.pin.y);return{x:s[0]+r.left,y:s[1]+r.top}},
-  demoDrag(dx,dy){const b=this.ballScreen(),l=Math.hypot(dx,dy),k=l>1?(l+CANCEL_R)/l:0;drag={sx:b.x,sy:b.y,cx:b.x+dx*k,cy:b.y+dy*k,demo:true}},
-  clearDrag(){drag=null},
+  demoDrag(dx,dy){wake();const b=this.ballScreen(),l=Math.hypot(dx,dy),k=l>1?(l+CANCEL_R)/l:0;drag={sx:b.x,sy:b.y,cx:b.x+dx*k,cy:b.y+dy*k,demo:true}},
+  clearDrag(){drag=null;wake()},
   demoNoZoom:false,
   startHole(num){const i=HOLES.findIndex(h=>h.num===num);if(i>=0){$('introOverlay').hidden=true;closeMap();startHole(i)}},
   get loftEl(){return document.querySelector('.loft')}
 };
-let prev=performance.now();
-function loop(now){const dt=Math.min((now-prev)/1000,0.05);prev=now;for(let i=0;i<3;i++)step(dt/3);draw(dt);requestAnimationFrame(loop)}
-ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,scale:1};cam.x=ball.x;cam.y=ball.y;resize();updateHud();requestAnimationFrame(loop);
+function loop(now){
+  const dt=Math.min((now-prev)/1000,0.05);prev=now;
+  if(state==='ready'&&lastState!=='ready')pulseUntil=now+4000;lastState=state;
+  for(let i=0;i<3;i++)step(dt/3);
+  if(!mapEl.classList.contains('open'))draw(dt);   // the map covers the canvas
+  const busy=state==='moving'||state==='sinking'||drag||pts.size||camMoved||flakes.length||now<wakeUntil||(state==='ready'&&now<pulseUntil&&!reduceMotion);
+  if(busy)requestAnimationFrame(loop);else running=false;
+}
+['pointerdown','pointermove','pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>wake()));
+if(document.fonts)document.fonts.ready.then(()=>wake());
+ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,scale:1};cam.x=ball.x;cam.y=ball.y;loadImg(hole);resize();updateHud();wake();
 })();
