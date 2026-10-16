@@ -1,4 +1,5 @@
-// Modal cards (menu, result, leaderboard): while one is open, everything else in #game is inert,
+// Page-level UI helpers.
+// 1. Modal cards (menu, result, leaderboard): while one is open, everything else in #game is inert,
 // so keyboard and screen-reader users stay inside the card. Focus moves in on open and back on close.
 (function(){
 const game=document.getElementById('game');
@@ -27,4 +28,10 @@ function onToggle(o){
 const mo=new MutationObserver(list=>list.forEach(m=>onToggle(m.target)));
 overlays.forEach(o=>mo.observe(o,{attributes:true,attributeFilter:['hidden']}));
 sync();
+
+// 2. When the OS switches light/dark, turn transitions off for one frame so colours swap at once instead of smearing.
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{
+  const st=document.createElement('style');st.textContent='*,*::before,*::after{transition:none !important}';
+  document.head.append(st);void document.body.offsetHeight;requestAnimationFrame(()=>requestAnimationFrame(()=>st.remove()));
+});
 })();
