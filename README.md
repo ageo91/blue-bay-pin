@@ -62,6 +62,12 @@ shoots, Escape cancels. Interface rules (contrast, focus, layout, copy) follow t
 the top of `css/style.css`: use `--accent-text` for orange text on cards (plain `--orange` is too
 light for text there) and `--focus` for focus rings.
 
+## Camera
+
+Near the green the camera zooms in by itself: from 60 m out it eases closer so the ball and the pin fill
+the middle 60% of the screen, up to 2.5x the normal zoom at 15 m or less (`nearS` in `draw()` in
+`js/game.js`). While aiming it still pulls back if the landing spot needs more room.
+
 ## Wind and aiming
 
 Wind is the same for every player on a given day: it is seeded from the hole number and the

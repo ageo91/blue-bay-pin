@@ -288,14 +288,20 @@ function inside(x,w){return Math.min(Math.max(x,w/2+8),W-w/2-8)}
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 function draw(dt){
   if(!ball)return;
-  let tS=baseScale,tx=ball.x,ty=ball.y;const aim=dragInfo();
+  // Approach zoom: from 60 m in, ease the camera closer so the ball and the pin fill the middle 60% of the
+  // screen, up to 2.5x the normal zoom at 15 m or less. Makes the cup and short putts big enough to aim at.
+  const pdx=hole.pin.x-ball.x,pdy=hole.pin.y-ball.y,dm=Math.hypot(pdx,pdy)*hole.m;
+  let t=Math.min(Math.max((60-dm)/45,0),1);t=t*t*(3-2*t);
+  const span=12/hole.m,fitBoth=Math.min(W*0.6/Math.max(Math.abs(pdx),span),H*0.6/Math.max(Math.abs(pdy),span));
+  const nearS=baseScale+(Math.min(Math.max(fitBoth,baseScale),baseScale*2.5)-baseScale)*t;
+  let tS=nearS,tx=ball.x+pdx*0.5*t,ty=ball.y+pdy*0.5*t;const aim=dragInfo();
   if(mapMode){tS=fitScale;tx=look?look.x:hole.w/2;ty=look?look.y:hole.h/2}
   else if(look&&!(aim&&aim.p>0)){tx=look.x;ty=look.y}
   else if(aim&&state==='ready'&&!window.BB.demoNoZoom){
     const lp=aim.p>0?landing(aim):{x:ball.x,y:ball.y},lx=lp.x,ly=lp.y;
     const x0=Math.min(ball.x,lx,hole.pin.x),x1=Math.max(ball.x,lx,hole.pin.x),y0=Math.min(ball.y,ly,hole.pin.y),y1=Math.max(ball.y,ly,hole.pin.y);
     const need=Math.min((W*0.82)/Math.max(x1-x0,1),((H-190)*0.85)/Math.max(y1-y0,1));
-    tS=Math.max(Math.min(baseScale,need),fitScale);tx=(x0+x1)/2;ty=(y0+y1)/2;
+    tS=Math.max(Math.min(nearS,need),fitScale);tx=(x0+x1)/2;ty=(y0+y1)/2;
   }
   const s0=scale,cx0=cam.x,cy0=cam.y;
   scale+=(tS-scale)*(reduceMotion?1:Math.min(dt*5,1));
