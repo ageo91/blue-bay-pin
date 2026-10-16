@@ -337,7 +337,8 @@ function draw(dt){
   camMoved=Math.abs(scale-s0)>scale*1e-4||Math.abs(cam.x-cx0)*scale>0.1||Math.abs(cam.y-cy0)*scale>0.1;
 
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=hole.bg;ctx.fillRect(0,0,W,H);
-  ctx.imageSmoothingEnabled=false;
+  // The hole artwork is painted, not pixel art: blend pixels when zoomed in instead of drawing hard blocks.
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   if(hole.img&&hole.img.complete){const o=w2s(0,0);ctx.drawImage(hole.img,o[0],o[1],hole.w*scale,hole.h*scale)}
   const h=w2s(hole.pin.x,hole.pin.y);
   ctx.fillStyle='#10301c';ctx.beginPath();ctx.ellipse(h[0],h[1]+2*scale,HOLE_R*scale,HOLE_R*scale*.7,0,0,Math.PI*2);ctx.fill();
