@@ -284,7 +284,7 @@ addEventListener('resize',()=>{if(mapEl.classList.contains('open'))mapApply()});
 
 function w2s(x,y){return[(x-cam.x)*scale+W/2,(y-cam.y)*scale+H/2]}
 // Centre x for a label of width w, kept 8px inside the canvas so labels near the edge stay readable
-function inside(x,w){return Math.min(Math.max(x,w/2+8),W-w/2-8)}
+function clampLabelX(x,w){return Math.min(Math.max(x,w/2+8),W-w/2-8)}
 // Golf ball: hexagonal dimple pattern (rolls with the ball), soft light from the top left, darker rim and a
 // small glint. Dimples only from 6px radius up; smaller than that they would read as noise.
 const dimples=(()=>{const c=document.createElement('canvas');c.width=14;c.height=24;const x=c.getContext('2d');   // hex grid: 14px between every pair of neighbours
@@ -372,17 +372,17 @@ function draw(dt){
     ctx.strokeStyle=col;ctx.beginPath();ctx.arc(b[0],b[1],R,-Math.PI/2,-Math.PI/2+Math.PI*2*d.p);ctx.stroke();
     const label=d.p>=0.99?'Max':Math.round(d.p*100)+'%';
     ctx.font='600 '+16*TS+'px Fraunces, Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    const tw=ctx.measureText(label).width+16*TS,px=inside(b[0],tw);ctx.fillStyle='rgba(30,42,99,.9)';roundRect(px-tw/2,b[1]-R-10-24*TS,tw,24*TS,12*TS);ctx.fill();
+    const tw=ctx.measureText(label).width+16*TS,px=clampLabelX(b[0],tw);ctx.fillStyle='rgba(30,42,99,.9)';roundRect(px-tw/2,b[1]-R-10-24*TS,tw,24*TS,12*TS);ctx.fill();
     ctx.fillStyle=col==='#FFFFFF'?'#F4ECDD':col;ctx.fillText(label,px,b[1]-R-10-12*TS);
-    ctx.font='500 '+12*TS+'px Outfit, system-ui, sans-serif';{const cm=Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m,t=putt?'Putt, about '+Math.max(1,Math.round(cm))+' m':LOFTS[loft].n+' shot, ~'+Math.round(cm/5)*5+' m, no wind',cw=ctx.measureText(t).width+14*TS,cx=inside(b[0],cw),cy=b[1]+R+4+12*TS;
+    ctx.font='500 '+12*TS+'px Outfit, system-ui, sans-serif';{const cm=Math.hypot(lp.x-ball.x,lp.y-ball.y)*hole.m,t=putt?'Putt, about '+Math.max(1,Math.round(cm))+' m':LOFTS[loft].n+' shot, ~'+Math.round(cm/5)*5+' m, no wind',cw=ctx.measureText(t).width+14*TS,cx=clampLabelX(b[0],cw),cy=b[1]+R+4+12*TS;
       ctx.fillStyle='rgba(30,42,99,.75)';roundRect(cx-cw/2,cy-10*TS,cw,20*TS,10*TS);ctx.fill();ctx.fillStyle='#FFFFFF';ctx.fillText(t,cx,cy)}
   }
   if(drag&&drag.armed&&!drag.demo&&!drag.kb&&state==='ready'){
-    const r=cv.getBoundingClientRect(),sx=drag.sx-r.left,sy=drag.sy-r.top,inside=d&&d.cancel,k=7;
-    ctx.save();ctx.fillStyle=inside?'rgba(224,68,58,.92)':'rgba(30,42,99,.6)';ctx.beginPath();ctx.arc(sx,sy,inside?24:20,0,Math.PI*2);ctx.fill();
+    const r=cv.getBoundingClientRect(),sx=drag.sx-r.left,sy=drag.sy-r.top,inZone=d&&d.cancel,k=7;
+    ctx.save();ctx.fillStyle=inZone?'rgba(224,68,58,.92)':'rgba(30,42,99,.6)';ctx.beginPath();ctx.arc(sx,sy,inZone?24:20,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx-k,sy-k);ctx.lineTo(sx+k,sy+k);ctx.moveTo(sx+k,sy-k);ctx.lineTo(sx-k,sy+k);ctx.stroke();
-    if(inside){const lbl='Release to cancel';ctx.font='500 '+13*TS+'px Outfit, system-ui, sans-serif';const tw=ctx.measureText(lbl).width+18*TS;
-      ctx.fillStyle='rgba(30,42,99,.92)';const lx=inside(sx,tw);roundRect(lx-tw/2,sy-34-26*TS,tw,26*TS,13*TS);ctx.fill();ctx.fillStyle='#F4ECDD';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,lx,sy-34-13*TS)}
+    if(inZone){const lbl='Release to cancel';ctx.font='500 '+13*TS+'px Outfit, system-ui, sans-serif';const tw=ctx.measureText(lbl).width+18*TS;
+      ctx.fillStyle='rgba(30,42,99,.92)';const lx=clampLabelX(sx,tw);roundRect(lx-tw/2,sy-34-26*TS,tw,26*TS,13*TS);ctx.fill();ctx.fillStyle='#F4ECDD';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,lx,sy-34-13*TS)}
     ctx.restore();
   }
   if(state==='ready'&&!(d&&d.p>0)){const pr=(reduceMotion||performance.now()>pulseUntil)?0.5:(Math.sin(performance.now()/350)+1)/2;ctx.strokeStyle='rgba(232,137,43,'+(0.45+pr*0.45)+')';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(b[0],b[1],Math.max(BALL_R*scale*3,26)-6+pr*4,0,Math.PI*2);ctx.stroke()}
@@ -418,10 +418,12 @@ window.BB={
   get loftEl(){return document.querySelector('.loft')}
 };
 function loop(now){
-  const dt=Math.min((now-prev)/1000,0.05);prev=now;
+  const dt=Math.min(Math.max((now-prev)/1000,0),0.05);prev=now;   // rAF time can trail the wake() time: never step backwards
   if(state==='ready'&&lastState!=='ready')pulseUntil=now+4000;lastState=state;
-  for(let i=0;i<3;i++)step(dt/3);
-  if(!mapEl.classList.contains('open'))draw(dt);   // the map covers the canvas
+  try{
+    for(let i=0;i<3;i++)step(dt/3);
+    if(!mapEl.classList.contains('open'))draw(dt);   // the map covers the canvas
+  }catch(err){console.error(err)}   // a drawing error must never freeze the game: the loop below still reschedules
   const busy=state==='moving'||state==='sinking'||drag||pts.size||camMoved||flakes.length||now<wakeUntil||(state==='ready'&&now<pulseUntil&&!reduceMotion);
   if(busy)requestAnimationFrame(loop);else running=false;
 }
