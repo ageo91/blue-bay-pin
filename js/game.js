@@ -19,11 +19,19 @@ function wake(ms){wakeUntil=Math.max(wakeUntil,performance.now()+(ms||250));if(!
 let hole=HOLES[0];
 function lieAt(x,y){const mx=Math.floor(x/4),my=Math.floor(y/4);if(mx<0||my<0||mx>=hole.mw||my>=hole.mh)return S.WATER;return hole.mask[my*hole.mw+mx]}
 function emit(name,detail){window.dispatchEvent(new CustomEvent('bb:'+name,{detail:detail}))}
+// Game feel: short effects that confirm what just happened (strike, landing, penalty, holed). They never block input.
+// Visual ones are skipped with reduced motion; haptics only fire on phones that support navigator.vibrate (Android).
+function buzz(p){if(navigator.vibrate)try{navigator.vibrate(p)}catch(e){}}
+function burst(type,x,y,dur){if(reduceMotion)return;fx.push({type:type,x:x,y:y,t:0,dur:dur||.45,a0:Math.random()*6.28});wake()}
+function shake(a){if(!reduceMotion){trauma=Math.min(1,trauma+a);wake()}}   // shake = trauma², so small events barely move the view
+function punchHud(){const p=document.querySelector('.hud .pill');if(reduceMotion||!p||!p.animate)return;
+  p.animate([{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,.9,.3,1.4)'})}
 const SNOW=false; // falling snow, switched off for now
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let baseScale=1,fitScale=1,scale=0,mapMode=false,W=0,H=0,dpr=1,cam={x:0,y:0};
+let fx=[],trauma=0,shakeT=0;   // game-feel effects (see burst/shake below)
 let wind={ax:0,ay:0,kmh:0},ball,strokes=0,state='intro',last,drag=null,look=null,pan=null,flakes=[],sinkT=0,trail=[],aimMark=null,closest=Infinity;
 
 // Wind is the same for every player: seeded by the hole and today's date in Curacao (UTC-4).
@@ -53,7 +61,7 @@ function windTip(num){const r=windRead(num);if(!r)return null;
 function startHole(i){
   hole=HOLES[i];loadImg(hole);wake();document.body.style.background=hole.bg;
   ball={x:hole.tee.x,y:hole.tee.y,vx:0,vy:0,vz:0,z:0,air:false,landed:false,scale:1};
-  strokes=0;closest=Infinity;kb=null;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
+  strokes=0;closest=Infinity;kb=null;fx=[];trauma=0;state='ready';last={x:ball.x,y:ball.y};setTimeout(()=>emit('start',{num:hole.num}),0);drag=null;look=null;pan=null;mapMode=false;syncMapBtn();
   wind=dailyWind(hole.num);trail=[];aimMark=null;
   $('windSpeed').textContent=wind.kmh;$('windArrow').style.transform='rotate('+(wind.wa*180/Math.PI+90)+'deg)';
   scale=0;resize();cam.x=ball.x;cam.y=ball.y;updateHud();$('hint').style.opacity=1;
@@ -152,8 +160,9 @@ cv.addEventListener('wheel',e=>{e.preventDefault();wake();if(state==='intro'||st
 // closest: nearest the ball came to rest before a shot (tee excluded), the leaderboard tiebreak
 function shoot(d){
   if(strokes>0)closest=Math.min(closest,Math.hypot(hole.pin.x-ball.x,hole.pin.y-ball.y)*hole.m);
-  strokes++;last={x:ball.x,y:ball.y};const k=hole.k;trail=[];aimMark=isPutt()?null:landing(d);
-  if(isPutt()){
+  strokes++;last={x:ball.x,y:ball.y};const k=hole.k,putt=isPutt();trail=[];aimMark=putt?null:landing(d);
+  burst('ring',ball.x,ball.y,.32);buzz(putt?6:12);punchHud();
+  if(putt){
     const v=eff(d.p)*PUTT0*Math.sqrt(k);ball.vx=d.ux*v;ball.vy=d.uy*v;ball.vz=0;ball.air=false;
   }else{
     const L=launch(d);ball.vx=d.ux*L.hv;ball.vy=d.uy*L.hv;ball.vz=L.vz;ball.grip=L.g;ball.air=true;ball.landed=false;
@@ -161,7 +170,7 @@ function shoot(d){
   state='moving';updateHud();emit('shot');
 }
 function penalty(lie){
-  strokes++;
+  strokes++;burst(lie===S.WATER?'splash':lie===S.TREES?'leaves':'rocks',ball.x,ball.y,.6);shake(.3);buzz([30,40,30]);punchHud();
   const toDrop=hole.drop&&(lie===S.WATER||lie===S.ROCKS);
   const msg=lie===S.WATER?'Splash. One-stroke penalty':lie===S.ROCKS?'Off the rocks and gone. One-stroke penalty':'Into the trees. One-stroke penalty';
   toast(msg+(toDrop?', playing from the drop zone.':'.'));
@@ -176,10 +185,12 @@ function step(dt){
       if(!trail.length||Math.hypot(ball.x-trail[trail.length-1].x,ball.y-trail[trail.length-1].y)>14)trail.push({x:ball.x,y:ball.y,z:ball.z});
       ball.vz-=G*dt;ball.vx+=wind.ax*dt;ball.vy+=wind.ay*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.z+=ball.vz*dt;ball.rx=(ball.rx||0)+ball.vx*dt*0.5;ball.ry=(ball.ry||0)+ball.vy*dt*0.5;
       if(ball.z<=0){
-        ball.z=0;const lie=lieAt(ball.x,ball.y);
+        ball.z=0;const lie=lieAt(ball.x,ball.y),iv=-ball.vz;
         if(hazard(lie)){penalty(lie);return}
         const sp=Math.hypot(ball.vx,ball.vy);
         if(dh<HOLE_R&&sp<320*rk){sink();return}
+        if(iv>60*rk){ball.sq=Math.min(iv/(450*rk),1);ball.sqT=0}   // squash harder on a steep landing
+        if(!ball.landed){burst(lie===S.SAND?'sand':'turf',ball.x,ball.y,.5);buzz(6)}
         if(!ball.landed&&lie===S.SAND)toast('Right into the bunker.');
         if(!ball.landed){ball.vx*=ball.grip;ball.vy*=ball.grip}
         ball.landed=true;
@@ -203,10 +214,11 @@ function step(dt){
     ball.vx-=ball.vx/sp*f;ball.vy-=ball.vy/sp*f;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;ball.rx=(ball.rx||0)+ball.vx*dt;ball.ry=(ball.ry||0)+ball.vy*dt;
   }else if(state==='sinking'){
     sinkT+=dt;ball.x+=(hole.pin.x-ball.x)*Math.min(dt*10,1);ball.y+=(hole.pin.y-ball.y)*Math.min(dt*10,1);ball.scale=Math.max(0,1-sinkT*2.5);
-    if(sinkT>0.6){state='done';showEnd()}
+    if(sinkT>(reduceMotion?0.6:1.1)){state='done';showEnd()}   // with motion, hold a beat so the cup burst is seen before the card
   }
 }
-function sink(){state='sinking';sinkT=0;ball.vx=ball.vy=ball.vz=0;ball.z=0;ball.air=false}
+function sink(){const ace=strokes===1;burst('cup',hole.pin.x,hole.pin.y,.8);shake(ace?.6:.3);buzz(ace?[20,50,20,50,60]:[15,60,25]);
+  state='sinking';sinkT=0;ball.vx=ball.vy=ball.vz=0;ball.z=0;ball.air=false}
 
 const NAMES={'-3':'Albatross','-2':'Eagle','-1':'Birdie','0':'Par','1':'Bogey','2':'Double bogey'};
 const LINES={
@@ -308,6 +320,20 @@ function drawBall(x,y,r){
   ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore();
   ctx.strokeStyle='rgba(30,42,99,.35)';ctx.lineWidth=Math.max(1,r*.06);ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
 }
+// Effects in world space, drawn under the ball. Particles fly out on an ease-out curve and fade.
+const FX_COL={turf:'86,140,62',sand:'226,204,156',leaves:'60,110,48',rocks:'150,146,138',splash:'235,248,255',cup:'232,137,43'};
+function drawFx(dt){
+  for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.t+=dt;if(f.t>=f.dur){fx.splice(i,1);continue}
+    const u=f.t/f.dur,e=1-Math.pow(1-u,3),p=w2s(f.x,f.y),z=Math.max(scale,.6),col=FX_COL[f.type]||'255,255,255';
+    const ring=(r,c,a,w)=>{ctx.strokeStyle='rgba('+c+','+a+')';ctx.lineWidth=w;ctx.beginPath();ctx.ellipse(p[0],p[1],r,r*.7,0,0,Math.PI*2);ctx.stroke()};
+    if(f.type==='ring'){ring(BALL_R*z*(1.2+e*2.6),'255,255,255',.75*(1-u),2);continue}
+    if(f.type==='splash'||f.type==='cup'){ring(BALL_R*z*(1.5+e*5),f.type==='cup'?'255,255,255':col,.85*(1-u),2.5);ring(BALL_R*z*(1+e*3),col,.9*(1-u),2)}
+    const n=f.type==='cup'?12:f.type==='splash'?10:8,reach=BALL_R*z*(f.type==='cup'?5:f.type==='splash'?3.5:2.6);
+    for(let j=0;j<n;j++){const a=f.a0+j*Math.PI*2/n+(j%2)*.3,d=reach*e*(.7+(j%3)*.15),lift=Math.sin(u*Math.PI)*reach*.5*(f.type==='cup'?0:1);
+      ctx.fillStyle='rgba('+(f.type==='cup'&&j%2?'255,214,120':col)+','+(1-u)+')';
+      ctx.beginPath();ctx.arc(p[0]+Math.cos(a)*d,p[1]+Math.sin(a)*d*.7-lift,Math.max(1.5,z*1.6)*(1-u*.5),0,Math.PI*2);ctx.fill()}
+  }
+}
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 function draw(dt){
   if(!ball)return;
@@ -337,6 +363,8 @@ function draw(dt){
   camMoved=Math.abs(scale-s0)>scale*1e-4||Math.abs(cam.x-cx0)*scale>0.1||Math.abs(cam.y-cy0)*scale>0.1;
 
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=hole.bg;ctx.fillRect(0,0,W,H);
+  if(trauma>0){trauma=Math.max(0,trauma-1.6*dt);shakeT+=dt;const m=trauma*trauma*10,n=k=>Math.sin(shakeT*41*k+k)*Math.cos(shakeT*23*k);
+    ctx.translate(m*n(1),m*n(1.7))}   // the HUD and overlays are HTML, so only the course shakes
   // The hole artwork is painted, not pixel art: blend pixels when zoomed in instead of drawing hard blocks.
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   if(hole.img&&hole.img.complete){const o=w2s(0,0);ctx.drawImage(hole.img,o[0],o[1],hole.w*scale,hole.h*scale)}
@@ -390,11 +418,15 @@ function draw(dt){
     if(aimMark){const a=w2s(aimMark.x,aimMark.y);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);ctx.stroke();ctx.restore()}
     ctx.fillStyle='rgba(255,255,255,.55)';for(const t of trail){const s=w2s(t.x,t.y);ctx.beginPath();ctx.arc(s[0],s[1]-t.z/hole.k*scale,2,0,Math.PI*2);ctx.fill()}
   }
+  drawFx(dt);
   if(state!=='done'){
     const zs=ball.z/hole.k;
     const r=BALL_R*scale*(1+zs/320)*ball.scale;
     ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(b[0]+zs*scale*.3,b[1]+zs*scale*.45+2,BALL_R*scale*ball.scale,BALL_R*scale*.7*ball.scale,0,0,Math.PI*2);ctx.fill();
-    drawBall(b[0],b[1]-zs*scale,Math.max(r,0));
+    const by=b[1]-zs*scale;
+    if(ball.sq){ball.sqT+=dt;const u=ball.sqT/.24;if(u>=1)ball.sq=0;else{   // squash on landing, then a small overshoot back
+      const a=ball.sq*.22*Math.cos(u*Math.PI*1.5)*(1-u);ctx.save();ctx.translate(b[0],by+r);ctx.scale(1+a,1-a);ctx.translate(-b[0],-(by+r))}}
+    drawBall(b[0],by,Math.max(r,0));if(ball.sq)ctx.restore();
   }
   if(h[0]<0||h[0]>W||h[1]<0||h[1]>H){
     const ang=Math.atan2(h[1]-H/2,h[0]-W/2),m=34;
@@ -424,7 +456,7 @@ function loop(now){
     for(let i=0;i<3;i++)step(dt/3);
     if(!mapEl.classList.contains('open'))draw(dt);   // the map covers the canvas
   }catch(err){console.error(err)}   // a drawing error must never freeze the game: the loop below still reschedules
-  const busy=state==='moving'||state==='sinking'||drag||pts.size||camMoved||flakes.length||now<wakeUntil||(state==='ready'&&now<pulseUntil&&!reduceMotion);
+  const busy=state==='moving'||state==='sinking'||fx.length||trauma>0||ball.sq||drag||pts.size||camMoved||flakes.length||now<wakeUntil||(state==='ready'&&now<pulseUntil&&!reduceMotion);
   if(busy)requestAnimationFrame(loop);else running=false;
 }
 ['pointerdown','pointermove','pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>wake()));

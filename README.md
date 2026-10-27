@@ -68,6 +68,18 @@ Near the green the camera zooms in by itself: from 60 m out it eases closer so t
 the middle 60% of the screen, up to 2.5x the normal zoom at 15 m or less (`nearS` in `draw()` in
 `js/game.js`). While aiming it still pulls back if the landing spot needs more room.
 
+## Game feel
+
+Short effects confirm each moment (`burst`, `shake`, `buzz`, `punchHud` in `js/game.js`):
+
+- **Strike:** white ring at the ball, the HUD card pops, and a light haptic tap.
+- **Landing:** the ball squashes on impact (harder on steep landings), with a turf or sand puff on the first bounce.
+- **Penalty:** a splash, leaves or rock chips where the ball went in, plus a small shake.
+- **Holed:** an orange and white burst at the cup and a small shake (bigger for a hole in one). The result card waits about half a second so the burst is seen.
+
+The shake moves only the course, never the HUD. Haptics need a phone that supports `navigator.vibrate`
+(Android; iPhones ignore it). With reduced motion on, the visual effects are skipped.
+
 ## Wind and aiming
 
 Wind is the same for every player on a given day: it is seeded from the hole number and the

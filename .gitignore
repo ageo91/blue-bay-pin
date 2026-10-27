@@ -3,3 +3,5 @@ dist/
 tools/preview-*.png
 __pycache__/
 .claude/
+.agents/
+skills-lock.json
